@@ -1,8 +1,6 @@
 import { join } from "path";
-import { homedir } from "os";
 import { existsSync, mkdirSync, appendFileSync, readdirSync, readFileSync } from "fs";
-
-const LOG_ROOT = join(homedir(), "AppData", "Roaming", ".carrotswitch", "logs");
+import { LOG_ROOT } from "./base.js";
 
 type LogLevel = "INFO" | "WARN" | "ERROR";
 

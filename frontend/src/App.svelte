@@ -183,7 +183,7 @@
           <RepositoryTab onRefresh={refresh} />
         </div>
       {:else if isAgentTab(selectedTab)}
-        <div class="mt-4 space-y-6">
+        <div class="mt-4 space-y-4">
           <!-- MCP Servers -->
           <section>
             <div class="flex items-center justify-between mb-2">
@@ -198,20 +198,15 @@
               </div>
             </div>
             {#if Object.keys(mcpServers).length > 0}
-              <div class="space-y-1.5">
+              <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                 {#each Object.entries(mcpServers) as [name, server]}
                   {@const enabled = agentMcpEnabled.includes(name)}
                   <div class="card">
-                    <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center justify-between gap-1">
                       <div class="min-w-0 flex-1">
-                        <div class="text-sm font-medium text-gray-800 truncate">{name}</div>
-                        <p class="text-[11px] text-gray-500 truncate mt-0.5">
+                        <div class="text-xs font-medium text-gray-800 truncate">{name}</div>
+                        <p class="text-[10px] text-gray-400 truncate">
                           {server.type}
-                          {#if server.command}
-                            · {server.command.join(' ')}
-                          {:else if server.url}
-                            · {server.url}
-                          {/if}
                         </p>
                       </div>
                       <EnableToggle {enabled} onToggle={() => toggleMcp(name)} />
@@ -238,14 +233,14 @@
               </div>
             </div>
             {#if skills.length > 0}
-              <div class="space-y-1.5">
+              <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                 {#each skills as skill}
                   {@const enabled = agentSkillsEnabled.includes(skill.name)}
                   <div class="card">
-                    <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center justify-between gap-1">
                       <div class="min-w-0 flex-1">
-                        <div class="text-sm font-medium text-gray-800 truncate">{skill.name}</div>
-                        <p class="text-[11px] text-gray-500 truncate mt-0.5">
+                        <div class="text-xs font-medium text-gray-800 truncate">{skill.name}</div>
+                        <p class="text-[10px] text-gray-400 truncate">
                           {skill.source || 'unknown'}
                         </p>
                       </div>
@@ -263,12 +258,12 @@
           {#if builtinSkills.length > 0}
             <section>
               <h2 class="text-sm font-medium text-gray-700 mb-2">Builtin Skills (read-only)</h2>
-              <div class="space-y-1.5">
+              <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                 {#each builtinSkills as skill}
                   <div class="card">
-                    <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center justify-between gap-1">
                       <div class="min-w-0 flex-1">
-                        <div class="text-sm font-medium text-gray-800 truncate">{skill.name}</div>
+                        <div class="text-xs font-medium text-gray-800 truncate">{skill.name}</div>
                       </div>
                       <EnableToggle
                         enabled={skill.allowed}

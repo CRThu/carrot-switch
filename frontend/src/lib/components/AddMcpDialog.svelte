@@ -1,8 +1,7 @@
 <script lang="ts">
   import { api } from '../api';
 
-  let { agent, onClose, onSaved }: {
-    agent: string;
+  let { onClose, onSaved }: {
     onClose: () => void;
     onSaved: () => void;
   } = $props();
@@ -54,7 +53,7 @@
       }
       const env = parseEnvVars(envVars);
       if (env) payload.environment = env;
-      await api.addMcpServer(agent, payload);
+      await api.addRepositoryMcp(payload);
       onSaved();
     } catch (e: any) {
       error = e.message || 'Failed to add server';

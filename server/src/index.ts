@@ -1,38 +1,44 @@
-import { join } from "path";
-import { existsSync } from "fs";
 import { createApi } from "./lib/api.js";
 import { migrateIfNeeded } from "./lib/migration.js";
+import { join } from "path";
 import { exec } from "child_process";
+
+const args = process.argv.slice(2);
+const noBrowser = args.includes("--no-browser");
 
 // Run migration before starting server
 migrateIfNeeded();
 
 const api = createApi();
 
-// Static file directory (frontend build output)
-const staticDir = join(import.meta.dir, "web", "static");
-
 // Find a free port
+const staticDir = join(import.meta.dir, "..", "..", "frontend", "dist");
+
 const server = Bun.serve({
   port: 0,
   fetch: (req) => {
-    // Try API routes first
     const url = new URL(req.url);
     if (url.pathname.startsWith("/api")) {
       return api.fetch(req);
     }
 
-    // Serve static files
-    let filePath = join(staticDir, url.pathname === "/" ? "index.html" : url.pathname);
+    const path = url.pathname === "/" ? "/index.html" : url.pathname;
+    const filePath = join(staticDir, path);
 
-    // SPA fallback: if file doesn't exist, serve index.html
-    if (!existsSync(filePath)) {
-      filePath = join(staticDir, "index.html");
-    }
+    try {
+      const file = Bun.file(filePath);
+      if (file.size > 0) {
+        return new Response(file);
+      }
+    } catch {}
 
-    if (existsSync(filePath)) {
-      return new Response(Bun.file(filePath));
-    }
+    // SPA fallback
+    try {
+      const indexFile = Bun.file(join(staticDir, "index.html"));
+      if (indexFile.size > 0) {
+        return new Response(indexFile);
+      }
+    } catch {}
 
     return new Response("Not Found", { status: 404 });
   },
@@ -55,7 +61,9 @@ function openBrowser(url: string) {
   }
 }
 
-// Open browser after a short delay to let server start
-setTimeout(() => openBrowser(url), 500);
+// Open browser after a short delay to let server start (unless --no-browser)
+if (!noBrowser) {
+  setTimeout(() => openBrowser(url), 500);
+}
 
 console.log("Press Ctrl+C to stop.");

@@ -1,9 +1,8 @@
 import { join } from "path";
-import { homedir } from "os";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "fs";
 import type { SkillMeta, SkillSourceType } from "@carrot-switch/shared";
+import { REPO_ROOT } from "../base.js";
 
-const REPO_ROOT = join(homedir(), "AppData", "Roaming", ".carrotswitch", "repository");
 const SKILL_DIR = join(REPO_ROOT, "skills");
 const META_FILE = join(REPO_ROOT, "skill-meta.json");
 

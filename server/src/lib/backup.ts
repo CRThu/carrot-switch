@@ -1,9 +1,7 @@
 import { join } from "path";
-import { homedir } from "os";
 import { existsSync, copyFileSync, cpSync, mkdirSync } from "fs";
 import { getUserSkillsDir } from "./skill/paths.js";
-
-const BACKUP_ROOT = join(homedir(), "AppData", "Roaming", ".carrotswitch", "backup");
+import { BACKUP_ROOT } from "./base.js";
 
 function timestamp(): string {
   const now = new Date();

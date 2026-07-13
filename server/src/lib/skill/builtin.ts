@@ -9,18 +9,15 @@ const HOME = homedir();
 
 // Builtin skills are read-only, shipped with the agent
 // Structure: builtin_skills/{version}/skills/{name}/SKILL.md
+// Note: Only MiMoCode has builtin skills
 const BUILTIN_SKILLS_BASE: Record<string, string> = {
-  opencode: join(HOME, ".codex", "skills", ".system"),
   mimocode: join(HOME, ".local", "share", "mimocode", "builtin_skills"),
-  claude: join(HOME, ".claude", "skills", ".system"),
 };
 
 const AGENT_CONFIGS: Record<string, any> = { opencode: oc, mimocode: mc, claude: cl };
 
-export function getBuiltinSkillsDir(agent: string): string {
-  const dir = BUILTIN_SKILLS_BASE[agent];
-  if (!dir) throw new Error(`Unknown agent: ${agent}`);
-  return dir;
+export function getBuiltinSkillsDir(agent: string): string | null {
+  return BUILTIN_SKILLS_BASE[agent] || null;
 }
 
 export interface BuiltinSkill {

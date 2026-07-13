@@ -113,14 +113,14 @@
     <section>
       <h3 class="text-xs font-medium text-gray-500 mb-2">MCP Servers ({Object.keys(mcpServers).length})</h3>
       {#if Object.keys(mcpServers).length > 0}
-        <div class="space-y-2">
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
           {#each Object.entries(mcpServers) as [name, server]}
             <div class="card">
               {#if editingMcp === name}
                 <!-- Edit form -->
                 <div class="space-y-2">
                   <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-gray-800">{name}</span>
+                    <span class="text-xs font-medium text-gray-800">{name}</span>
                     <span class="text-[10px] text-gray-400">editing</span>
                   </div>
                   <div>
@@ -158,41 +158,32 @@
                     </div>
                   {/if}
                   <div>
-                    <label for="edit-env" class="text-[10px] text-gray-500 block mb-0.5">Environment (KEY=VALUE, one per line)</label>
+                    <label for="edit-env" class="text-[10px] text-gray-500 block mb-0.5">Env (KEY=VALUE)</label>
                     <textarea
                       id="edit-env"
-                      class="w-full text-xs border border-gray-200 rounded px-2 py-1 h-16"
+                      class="w-full text-xs border border-gray-200 rounded px-2 py-1 h-12"
                       bind:value={editForm.environment}
                       placeholder="KEY=VALUE"
                     ></textarea>
                   </div>
                   <div class="flex justify-end gap-1.5">
-                    <button class="btn-secondary text-xs" onclick={cancelEdit}>Cancel</button>
-                    <button class="btn-primary text-xs" onclick={saveEdit}>Save</button>
+                    <button class="btn-ghost text-[10px]" onclick={cancelEdit}>Cancel</button>
+                    <button class="btn-primary text-[10px] px-2 py-0.5" onclick={saveEdit}>Save</button>
                   </div>
                 </div>
               {:else}
                 <!-- Display mode -->
-                <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center justify-between gap-1">
                   <div class="min-w-0 flex-1">
-                    <div class="text-sm font-medium text-gray-800 truncate">{name}</div>
-                    <p class="text-[11px] text-gray-500 truncate mt-0.5">{getMcpSubtitle(server)}</p>
-                    {#if server.command}
-                      <p class="text-[10px] text-gray-400 truncate mt-0.5">
-                        {server.command.join(' ')}
-                      </p>
-                    {:else if server.url}
-                      <p class="text-[10px] text-gray-400 truncate mt-0.5">
-                        {server.url}
-                      </p>
-                    {/if}
+                    <div class="text-xs font-medium text-gray-800 truncate">{name}</div>
+                    <p class="text-[10px] text-gray-400 truncate">{getMcpSubtitle(server)}</p>
                   </div>
-                  <div class="flex items-center gap-1">
-                    <button class="btn-secondary text-[10px] px-1.5 py-0.5" onclick={() => startEdit(name)}>
+                  <div class="flex items-center gap-0.5">
+                    <button class="btn-ghost text-[10px] px-1" onclick={() => startEdit(name)}>
                       Edit
                     </button>
-                    <button class="btn-danger text-[10px] px-1.5 py-0.5" onclick={() => deleteMcp(name)}>
-                      Delete
+                    <button class="btn-danger text-[10px] px-1" onclick={() => deleteMcp(name)}>
+                      Del
                     </button>
                   </div>
                 </div>
@@ -209,21 +200,18 @@
     <section>
       <h3 class="text-xs font-medium text-gray-500 mb-2">Skills ({skills.length})</h3>
       {#if skills.length > 0}
-        <div class="space-y-2">
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
           {#each skills as skill}
             <div class="card">
-              <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center justify-between gap-1">
                 <div class="min-w-0 flex-1">
-                  <div class="text-sm font-medium text-gray-800 truncate">{skill.name}</div>
-                  <p class="text-[11px] text-gray-500 truncate mt-0.5">
+                  <div class="text-xs font-medium text-gray-800 truncate">{skill.name}</div>
+                  <p class="text-[10px] text-gray-400 truncate">
                     {skill.sourceType} · {skill.installedAt.split('T')[0]}
                   </p>
-                  {#if skill.description}
-                    <p class="text-[10px] text-gray-400 truncate mt-0.5">{skill.description}</p>
-                  {/if}
                 </div>
-                <button class="btn-danger text-[10px] px-1.5 py-0.5" onclick={() => deleteSkill(skill.name)}>
-                  Delete
+                <button class="btn-danger text-[10px] px-1" onclick={() => deleteSkill(skill.name)}>
+                  Del
                 </button>
               </div>
             </div>

@@ -1,5 +1,4 @@
 import { join } from "path";
-import { homedir } from "os";
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync, renameSync } from "fs";
 import * as repository from "./repository/mcp.js";
 import * as repoSkill from "./repository/skill.js";
@@ -7,8 +6,7 @@ import * as agentMcp from "./agent/mcp.js";
 import * as agentSkill from "./agent/skill.js";
 import type { RepositoryMcp, McpType } from "@carrot-switch/shared";
 import { info, warn } from "./logger.js";
-
-const STORE_ROOT = join(homedir(), "AppData", "Roaming", ".carrotswitch");
+import { CARROT_ROOT } from "./base.js";
 
 function nowIso(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -23,8 +21,8 @@ function readJsonSafe(filePath: string): any {
 }
 
 export function migrateIfNeeded(): void {
-  const oldMcpDir = join(STORE_ROOT, "mcps");
-  const oldSkillDir = join(STORE_ROOT, "skills");
+  const oldMcpDir = join(CARROT_ROOT, "mcps");
+  const oldSkillDir = join(CARROT_ROOT, "skills");
 
   if (!existsSync(oldMcpDir) && !existsSync(oldSkillDir)) {
     return; // No old data to migrate

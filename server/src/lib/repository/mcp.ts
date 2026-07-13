@@ -1,9 +1,8 @@
 import { join } from "path";
-import { homedir } from "os";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
 import type { RepositoryMcp, McpType } from "@carrot-switch/shared";
+import { REPO_ROOT } from "../base.js";
 
-const REPO_ROOT = join(homedir(), "AppData", "Roaming", ".carrotswitch", "repository");
 const MCP_DIR = join(REPO_ROOT, "mcps");
 
 function nowIso(): string {

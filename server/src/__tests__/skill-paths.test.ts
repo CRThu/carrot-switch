@@ -30,10 +30,9 @@ describe("Skill paths", () => {
   });
 
   describe("getBuiltinSkillsDir", () => {
-    it("returns correct path for opencode", () => {
-      const expected = join(homedir(), ".codex", "skills", ".system");
+    it("returns null for opencode (no builtin skills)", () => {
       const { getBuiltinSkillsDir } = require("../lib/skill/paths.js");
-      expect(getBuiltinSkillsDir("opencode")).toBe(expected);
+      expect(getBuiltinSkillsDir("opencode")).toBeNull();
     });
 
     it("returns correct path for mimocode", () => {
@@ -42,15 +41,14 @@ describe("Skill paths", () => {
       expect(getBuiltinSkillsDir("mimocode")).toBe(expected);
     });
 
-    it("returns correct path for claude", () => {
-      const expected = join(homedir(), ".claude", "skills", ".system");
+    it("returns null for claude (no builtin skills)", () => {
       const { getBuiltinSkillsDir } = require("../lib/skill/paths.js");
-      expect(getBuiltinSkillsDir("claude")).toBe(expected);
+      expect(getBuiltinSkillsDir("claude")).toBeNull();
     });
 
-    it("throws for unknown agent", () => {
+    it("returns null for unknown agent", () => {
       const { getBuiltinSkillsDir } = require("../lib/skill/paths.js");
-      expect(() => getBuiltinSkillsDir("unknown")).toThrow("Unknown agent");
+      expect(getBuiltinSkillsDir("unknown")).toBeNull();
     });
   });
 });

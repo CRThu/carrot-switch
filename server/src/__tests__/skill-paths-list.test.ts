@@ -45,10 +45,10 @@ describe("Skill paths - listSkills", () => {
   });
 
   describe("getBuiltinSkillsDir", () => {
-    it("returns path containing 'codex' for opencode", () => {
+    it("returns null for opencode (no builtin skills)", () => {
       const { getBuiltinSkillsDir } = require("../lib/skill/paths.js");
       const path = getBuiltinSkillsDir("opencode");
-      expect(path).toContain("codex");
+      expect(path).toBeNull();
     });
 
     it("returns path containing 'mimocode' for mimocode", () => {
@@ -57,21 +57,20 @@ describe("Skill paths - listSkills", () => {
       expect(path).toContain("mimocode");
     });
 
-    it("returns path containing 'claude' for claude", () => {
+    it("returns null for claude (no builtin skills)", () => {
       const { getBuiltinSkillsDir } = require("../lib/skill/paths.js");
       const path = getBuiltinSkillsDir("claude");
-      expect(path).toContain("claude");
+      expect(path).toBeNull();
     });
 
-    it("throws for unknown agent", () => {
+    it("returns null for unknown agent", () => {
       const { getBuiltinSkillsDir } = require("../lib/skill/paths.js");
-      expect(() => getBuiltinSkillsDir("unknown")).toThrow("Unknown agent");
+      expect(getBuiltinSkillsDir("unknown")).toBeNull();
     });
   });
 
   describe("listSkills", () => {
     it("returns empty array when no skills directories exist", () => {
-      // The real paths likely don't exist in test env, so listSkills should return empty
       const { listSkills } = require("../lib/skill/paths.js");
       const skills = listSkills("opencode");
       expect(Array.isArray(skills)).toBe(true);

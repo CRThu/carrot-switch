@@ -1,13 +1,11 @@
 import { join } from "path";
-import { homedir } from "os";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync, rmSync } from "fs";
 import * as repository from "../repository/skill.js";
 import { getUserSkillsDir } from "../skill/paths.js";
 import * as oc from "../config/opencode.js";
 import * as mc from "../config/mimocode.js";
 import * as cl from "../config/claude.js";
-
-const AGENTS_ROOT = join(homedir(), "AppData", "Roaming", ".carrotswitch", "agents");
+import { AGENTS_ROOT } from "../base.js";
 
 const AGENTS: Record<string, any> = { opencode: oc, mimocode: mc, claude: cl };
 
