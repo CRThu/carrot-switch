@@ -11,6 +11,8 @@ class SkillPaths:
             return self._home / ".codex" / "skills"
         if agent == "mimocode":
             return self._home / ".local" / "share" / "mimocode" / "skills"
+        if agent == "claude":
+            return self._home / ".claude" / "skills"
         raise ValueError(f"Unknown agent: {agent}")
 
     def _get_builtin_skills(self, agent: str) -> Path:
@@ -18,6 +20,9 @@ class SkillPaths:
             return self._home / ".codex" / "skills" / ".system"
         if agent == "mimocode":
             return self._home / ".local" / "share" / "mimocode" / "builtin_skills"
+        if agent == "claude":
+            # Claude doesn't have a builtin skills directory in the same way
+            return self._home / ".claude" / "skills" / ".system"
         raise ValueError(f"Unknown agent: {agent}")
 
     def get_user_skills_dir(self, agent: str) -> Path:

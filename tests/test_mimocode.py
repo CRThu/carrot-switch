@@ -7,12 +7,10 @@ from carrot_switch.config import mimocode
 
 @pytest.fixture(autouse=True)
 def mock_config_path(tmp_home):
-    """Override CONFIG_PATH for all tests in this module."""
+    """Create the config directory for all tests in this module."""
     config_dir = tmp_home / ".config" / "mimocode"
     config_dir.mkdir(parents=True, exist_ok=True)
-    with pytest.MonkeyPatch.context() as m:
-        m.setattr(mimocode, "CONFIG_PATH", config_dir / "mimocode.jsonc")
-        yield
+    yield
 
 
 @pytest.fixture

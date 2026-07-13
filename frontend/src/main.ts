@@ -24,13 +24,15 @@ window.onunhandledrejection = (e) => {
   showError(String(e.reason?.message || e.reason || '未知错误'));
 };
 
-try {
-  const { mount } = await import('svelte');
-  const { default: App } = await import('./App.svelte');
-  mount(App, { target: document.getElementById('app')! });
-} catch (e) {
-  showError(
-    (e as Error).message || '组件加载失败',
-    (e as Error).stack?.split('\n').slice(0, 3).join('\n')
-  );
-}
+(async () => {
+  try {
+    const { mount } = await import('svelte');
+    const { default: App } = await import('./App.svelte');
+    mount(App, { target: document.getElementById('app')! });
+  } catch (e) {
+    showError(
+      (e as Error).message || '组件加载失败',
+      (e as Error).stack?.split('\n').slice(0, 3).join('\n')
+    );
+  }
+})();

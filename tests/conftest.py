@@ -18,6 +18,17 @@ def tmp_home(tmp_path):
 
 
 @pytest.fixture
+def tmp_store(tmp_home):
+    """Isolate store root to tmp_home."""
+    store_root = tmp_home / "AppData" / "Roaming" / ".carrotswitch"
+    store_root.mkdir(parents=True)
+    with patch("carrot_switch.store.STORE_ROOT", store_root):
+        with patch("carrot_switch.store.mcp.STORE_ROOT", store_root):
+            with patch("carrot_switch.store.skill.STORE_ROOT", store_root):
+                yield store_root
+
+
+@pytest.fixture
 def tmp_config_dir(tmp_home):
     """Create a temporary config directory structure."""
     config_dir = tmp_home / ".config" / "opencode"

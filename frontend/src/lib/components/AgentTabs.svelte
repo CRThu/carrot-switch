@@ -6,12 +6,18 @@
     selectedAgent: string;
     onSelect: (agent: string) => void;
   } = $props();
+
+  const labels: Record<string, string> = {
+    opencode: 'OpenCode',
+    mimocode: 'MiMoCode',
+    claude: 'Claude',
+  };
 </script>
 
-<div class="flex gap-2 border-b border-gray-200">
+<div class="flex gap-1 border-b border-gray-200">
   {#each agents as agent}
     <button
-      class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
+      class="px-3 py-1.5 text-xs font-medium border-b-2 transition-colors"
       class:border-carrot-500={selectedAgent === agent.name}
       class:text-carrot-600={selectedAgent === agent.name}
       class:border-transparent={selectedAgent !== agent.name}
@@ -22,9 +28,9 @@
       disabled={!agent.available}
       onclick={() => onSelect(agent.name)}
     >
-      {agent.name === 'opencode' ? 'OpenCode' : 'MiMoCode'}
+      {labels[agent.name] || agent.name}
       {#if !agent.available}
-        <span class="text-xs text-gray-400 ml-1">(not installed)</span>
+        <span class="text-[10px] text-gray-400 ml-1">(n/a)</span>
       {/if}
     </button>
   {/each}

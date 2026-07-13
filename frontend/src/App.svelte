@@ -72,20 +72,25 @@
 </script>
 
 <div class="min-h-screen bg-gray-50">
-  <header class="bg-white border-b border-gray-200 px-6 py-4">
-    <h1 class="text-xl font-bold text-carrot-600">Carrot Switch</h1>
+  <header class="bg-white border-b border-gray-200 px-4 py-3">
+    <div class="max-w-5xl mx-auto flex items-center gap-2">
+      <div class="w-6 h-6 bg-carrot-500 rounded-md flex items-center justify-center">
+        <span class="text-white text-xs font-bold">C</span>
+      </div>
+      <h1 class="text-base font-semibold text-gray-800">Carrot Switch</h1>
+    </div>
   </header>
 
-  <main class="max-w-5xl mx-auto p-6">
+  <main class="max-w-5xl mx-auto px-4 py-4">
     {#if error}
-      <div class="bg-red-50 border border-red-200 rounded-lg p-6 mt-6">
+      <div class="bg-red-50 border border-red-200 rounded-md p-4 mt-4">
         <div class="flex items-start gap-3">
-          <div class="text-red-500 text-lg mt-0.5">!</div>
+          <div class="text-red-500 text-sm mt-0.5">!</div>
           <div>
-            <h3 class="text-red-800 font-medium">应用启动失败</h3>
-            <p class="text-red-600 text-sm mt-1">{error}</p>
+            <h3 class="text-red-800 font-medium text-sm">应用启动失败</h3>
+            <p class="text-red-600 text-xs mt-1">{error}</p>
             <button
-              class="mt-3 px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+              class="mt-2 px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
               onclick={init}
             >
               重试
@@ -97,52 +102,46 @@
       <AgentTabs {agents} {selectedAgent} onSelect={handleAgentChange} />
 
       {#if selectedAgent}
-        <section class="mt-6">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-800">MCP Servers</h2>
-            <button
-              class="px-3 py-1.5 text-sm bg-carrot-500 text-white rounded hover:bg-carrot-600"
-              onclick={() => (showAddMcp = true)}
-            >
-              + Add Server
+        <section class="mt-4">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-medium text-gray-700">MCP Servers</h2>
+            <button class="btn-primary" onclick={() => (showAddMcp = true)}>
+              + Add
             </button>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {#each Object.entries(mcpServers) as [name, server]}
-              <McpCard {name} {server} agent={selectedAgent} onRefresh={refresh} />
-            {/each}
-          </div>
-          {#if Object.keys(mcpServers).length === 0}
-            <p class="text-gray-400 text-sm">No MCP servers configured</p>
+          {#if Object.keys(mcpServers).length > 0}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+              {#each Object.entries(mcpServers) as [name, server]}
+                <McpCard {name} {server} agent={selectedAgent} onRefresh={refresh} />
+              {/each}
+            </div>
+          {:else}
+            <div class="empty-state">No MCP servers configured</div>
           {/if}
         </section>
 
-        <section class="mt-8">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-800">Skills</h2>
-            <div class="flex gap-2">
-              <button
-                class="px-3 py-1.5 text-sm bg-carrot-500 text-white rounded hover:bg-carrot-600"
-                onclick={() => (showInstallSkill = true)}
-              >
-                + Install Skill
-              </button>
+        <section class="section">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-medium text-gray-700">Skills</h2>
+            <button class="btn-primary" onclick={() => (showInstallSkill = true)}>
+              + Install
+            </button>
+          </div>
+          {#if skills.length > 0}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+              {#each skills as skill}
+                <SkillCard {skill} agent={selectedAgent} onRefresh={refresh} />
+              {/each}
             </div>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {#each skills as skill}
-              <SkillCard {skill} agent={selectedAgent} onRefresh={refresh} />
-            {/each}
-          </div>
-          {#if skills.length === 0}
-            <p class="text-gray-400 text-sm">No skills installed</p>
+          {:else}
+            <div class="empty-state">No skills installed</div>
           {/if}
         </section>
       {:else}
-        <p class="text-gray-500 mt-8">No agents installed. Please install OpenCode or MiMoCode first.</p>
+        <div class="empty-state mt-8">No agents installed</div>
       {/if}
     {:else}
-      <p class="text-gray-500 mt-8">Loading agents...</p>
+      <div class="empty-state mt-8">Loading agents...</div>
     {/if}
   </main>
 

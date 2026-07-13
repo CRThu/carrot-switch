@@ -1,63 +1,20 @@
 """OpenCode configuration CRUD."""
 from pathlib import Path
-from carrot_switch.config import read_jsonc, write_jsonc
-
-CONFIG_PATH = Path.home() / ".config" / "opencode" / "opencode.jsonc"
+from carrot_switch.config.base import LazyBaseConfig
 
 
-def get_config_path() -> Path:
-    return CONFIG_PATH
+def _get_path() -> Path:
+    return Path.home() / ".config" / "opencode" / "opencode.jsonc"
 
 
-def is_available() -> bool:
-    return CONFIG_PATH.parent.exists()
+_config = LazyBaseConfig(_get_path)
 
-
-def get_mcp_servers() -> dict:
-    cfg = read_jsonc(CONFIG_PATH)
-    return cfg.get("mcp", {})
-
-
-def add_mcp_server(name: str, server: dict) -> None:
-    cfg = read_jsonc(CONFIG_PATH)
-    cfg.setdefault("mcp", {})[name] = server
-    write_jsonc(CONFIG_PATH, cfg)
-
-
-def update_mcp_server(name: str, server: dict) -> None:
-    cfg = read_jsonc(CONFIG_PATH)
-    if name not in cfg.get("mcp", {}):
-        raise KeyError(f"MCP server '{name}' not found")
-    cfg["mcp"][name] = server
-    write_jsonc(CONFIG_PATH, cfg)
-
-
-def delete_mcp_server(name: str) -> None:
-    cfg = read_jsonc(CONFIG_PATH)
-    servers = cfg.get("mcp", {})
-    if name not in servers:
-        raise KeyError(f"MCP server '{name}' not found")
-    del servers[name]
-    write_jsonc(CONFIG_PATH, cfg)
-
-
-def toggle_mcp_server(name: str) -> bool:
-    cfg = read_jsonc(CONFIG_PATH)
-    servers = cfg.get("mcp", {})
-    if name not in servers:
-        raise KeyError(f"MCP server '{name}' not found")
-    current = servers[name].get("enabled", True)
-    servers[name]["enabled"] = not current
-    write_jsonc(CONFIG_PATH, cfg)
-    return not current
-
-
-def get_skills_permission() -> dict:
-    cfg = read_jsonc(CONFIG_PATH)
-    return cfg.get("permission", {}).get("skill", {})
-
-
-def set_skill_permission(name: str, allowed: bool) -> None:
-    cfg = read_jsonc(CONFIG_PATH)
-    cfg.setdefault("permission", {}).setdefault("skill", {})[name] = "allow" if allowed else "deny"
-    write_jsonc(CONFIG_PATH, cfg)
+get_config_path = _config.get_config_path
+is_available = _config.is_available
+get_mcp_servers = _config.get_mcp_servers
+add_mcp_server = _config.add_mcp_server
+update_mcp_server = _config.update_mcp_server
+delete_mcp_server = _config.delete_mcp_server
+toggle_mcp_server = _config.toggle_mcp_server
+get_skills_permission = _config.get_skills_permission
+set_skill_permission = _config.set_skill_permission

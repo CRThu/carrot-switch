@@ -5,12 +5,10 @@ from carrot_switch.config import opencode
 
 @pytest.fixture(autouse=True)
 def mock_config_path(tmp_home):
-    """Override CONFIG_PATH for all tests in this module."""
+    """Create the config directory for all tests in this module."""
     config_dir = tmp_home / ".config" / "opencode"
     config_dir.mkdir(parents=True, exist_ok=True)
-    with pytest.MonkeyPatch.context() as m:
-        m.setattr(opencode, "CONFIG_PATH", config_dir / "opencode.jsonc")
-        yield
+    yield
 
 
 @pytest.fixture

@@ -6,9 +6,9 @@ from carrot_switch.web.app import create_app
 
 
 @pytest.fixture
-def client(tmp_home):
+def client(tmp_home, tmp_store):
     """Create a test client with mocked config paths."""
-    from carrot_switch.config import opencode, mimocode, write_jsonc
+    from carrot_switch.config import write_jsonc
 
     oc_dir = tmp_home / ".config" / "opencode"
     oc_dir.mkdir(parents=True)
@@ -17,6 +17,10 @@ def client(tmp_home):
     mc_dir = tmp_home / ".config" / "mimocode"
     mc_dir.mkdir(parents=True)
     write_jsonc(mc_dir / "mimocode.jsonc", {"mcp": {}, "permission": {}})
+
+    # Claude config
+    claude_config = tmp_home / ".claude.json"
+    claude_config.write_text('{"mcpServers": {}}', encoding="utf-8")
 
     app = create_app()
     return TestClient(app)
@@ -27,10 +31,11 @@ class TestAgentsEndpoint:
         resp = client.get("/api/agents")
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data["agents"]) == 2
+        assert len(data["agents"]) == 3
         names = [a["name"] for a in data["agents"]]
         assert "opencode" in names
         assert "mimocode" in names
+        assert "claude" in names
 
 
 class TestMcpEndpoints:

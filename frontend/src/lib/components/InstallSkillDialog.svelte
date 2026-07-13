@@ -12,6 +12,20 @@
   let error = $state('');
   let saving = $state(false);
 
+  const placeholders: Record<string, string> = {
+    github: 'owner/repo or https://github.com/owner/repo',
+    local: 'C:\\path\\to\\skill',
+    zip: 'C:\\path\\to\\skill.zip or https://example.com/skill.zip',
+    url: 'https://example.com/skill.tar.gz',
+  };
+
+  const labels: Record<string, string> = {
+    github: 'GitHub URL or owner/repo',
+    local: 'Local Directory Path',
+    zip: 'ZIP File Path or URL',
+    url: 'Archive URL',
+  };
+
   async function install() {
     if (!source.trim()) {
       error = 'Source is required';
@@ -35,50 +49,39 @@
 <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onclick={onClose}>
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="bg-white rounded-lg p-6 w-full max-w-md shadow-xl" onclick={(e) => e.stopPropagation()}>
-    <h3 class="text-lg font-semibold mb-4">Install Skill</h3>
+  <div class="bg-white rounded-lg p-4 w-full max-w-sm shadow-xl" onclick={(e) => e.stopPropagation()}>
+    <h3 class="text-sm font-semibold text-gray-800 mb-3">Install Skill</h3>
 
-    <div class="space-y-4">
+    <div class="space-y-3">
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Source Type</label>
-        <select
-          bind:value={sourceType}
-          class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-carrot-500"
-        >
+        <label for="skill-type" class="label">Source Type</label>
+        <select id="skill-type" bind:value={sourceType} class="input">
           <option value="github">GitHub</option>
           <option value="local">Local Directory</option>
+          <option value="zip">ZIP File</option>
+          <option value="url">URL (tar.gz/zip)</option>
         </select>
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          {sourceType === 'github' ? 'GitHub URL or owner/repo' : 'Local Path'}
-        </label>
+        <label for="skill-source" class="label">{labels[sourceType]}</label>
         <input
+          id="skill-source"
           type="text"
           bind:value={source}
-          class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-carrot-500"
-          placeholder={sourceType === 'github' ? 'owner/repo or https://github.com/owner/repo' : 'C:\\path\\to\\skill'}
+          class="input"
+          placeholder={placeholders[sourceType]}
         />
       </div>
 
       {#if error}
-        <p class="text-sm text-red-500">{error}</p>
+        <p class="text-xs text-red-500">{error}</p>
       {/if}
     </div>
 
-    <div class="flex justify-end gap-2 mt-6">
-      <button
-        class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
-        onclick={onClose}
-      >
-        Cancel
-      </button>
-      <button
-        class="px-4 py-2 text-sm bg-carrot-500 text-white rounded hover:bg-carrot-600 disabled:opacity-50"
-        disabled={saving}
-        onclick={install}
-      >
+    <div class="flex justify-end gap-2 mt-4">
+      <button class="btn-ghost" onclick={onClose}>Cancel</button>
+      <button class="btn-primary" disabled={saving} onclick={install}>
         {saving ? 'Installing...' : 'Install'}
       </button>
     </div>

@@ -11,7 +11,7 @@ from carrot_switch.skill import manager, paths
 
 
 @pytest.fixture
-def real_env(tmp_home):
+def real_env(tmp_home, tmp_store):
     """Set up a realistic environment with opencode + mimocode configs."""
     # Mock BACKUP_ROOT to use tmp_home
     backup_root = tmp_home / "AppData" / "Roaming" / ".carrotswitch"
@@ -38,11 +38,11 @@ def real_env(tmp_home):
             "permission": {"skill": {}},
         })
 
-        # Mock CONFIG_PATH for both modules
-        from carrot_switch.config import opencode as oc, mimocode as mc
-        with patch.object(oc, "CONFIG_PATH", oc_config / "opencode.jsonc"):
-            with patch.object(mc, "CONFIG_PATH", mc_config / "mimocode.jsonc"):
-                yield tmp_home
+        # Claude config
+        claude_config = tmp_home / ".claude.json"
+        claude_config.write_text('{"mcpServers": {}}', encoding="utf-8")
+
+        yield tmp_home
 
 
 @pytest.fixture
@@ -228,7 +228,8 @@ class TestAgentAvailability:
         shutil.rmtree(real_env / ".config" / "mimocode")
 
         from carrot_switch.web.app import create_app
-        client = TestClient(create_app())
+        with patch("pathlib.Path.home", return_value=real_env):
+            client = TestClient(create_app())
 
-        resp = client.get("/api/mcp/mimocode")
-        assert resp.status_code == 404
+            resp = client.get("/api/mcp/mimocode")
+            assert resp.status_code == 404

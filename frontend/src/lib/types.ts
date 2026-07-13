@@ -6,11 +6,12 @@ export interface Agent {
 
 export interface McpServer {
   name: string;
-  type: 'local' | 'remote' | 'http';
+  type: 'local' | 'remote';
   command?: string[];
   url?: string;
   enabled: boolean;
   environment?: Record<string, string>;
+  created_at?: string;
 }
 
 export interface Skill {
@@ -18,17 +19,20 @@ export interface Skill {
   allowed: boolean;
   builtin: boolean;
   path: string;
+  source?: string;
+  source_type?: string;
+  installed_at?: string;
 }
 
 export interface AddMcpPayload {
   name: string;
-  type: 'local' | 'remote' | 'http';
-  command?: string[];
+  type: 'local' | 'remote';
+  command?: string;
   url?: string;
   environment?: Record<string, string>;
 }
 
 export interface InstallSkillPayload {
   source: string;
-  source_type: 'local' | 'github';
+  source_type: 'local' | 'github' | 'zip' | 'url';
 }

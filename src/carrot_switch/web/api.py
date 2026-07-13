@@ -1,7 +1,8 @@
 """REST API routes."""
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from carrot_switch.config import opencode as oc, mimocode as mc
+from carrot_switch.config import opencode as oc, mimocode as mc, claude as cl
+from carrot_switch.store import mcp as mcp_store, skill as skill_store
 from carrot_switch.skill import manager as skill_mgr
 
 router = APIRouter(prefix="/api")
@@ -10,7 +11,7 @@ router = APIRouter(prefix="/api")
 class AddMcpRequest(BaseModel):
     name: str
     type: str = "local"
-    command: list[str] | None = None
+    command: str | list[str] | None = None
     url: str | None = None
     environment: dict[str, str] | None = None
 
@@ -20,12 +21,18 @@ class InstallSkillRequest(BaseModel):
     source_type: str = "github"
 
 
+AGENTS = {
+    "opencode": oc,
+    "mimocode": mc,
+    "claude": cl,
+}
+
+
 def _get_config(agent: str):
-    if agent == "opencode":
-        return oc
-    if agent == "mimocode":
-        return mc
-    raise HTTPException(404, f"Unknown agent: {agent}")
+    cfg = AGENTS.get(agent)
+    if not cfg:
+        raise HTTPException(404, f"Unknown agent: {agent}")
+    return cfg
 
 
 def _check_available(agent: str):
@@ -38,17 +45,19 @@ def _check_available(agent: str):
 async def list_agents():
     return {
         "agents": [
-            {"name": "opencode", "available": oc.is_available(), "config_path": str(oc.get_config_path())},
-            {"name": "mimocode", "available": mc.is_available(), "config_path": str(mc.get_config_path())},
+            {"name": name, "available": cfg.is_available(), "config_path": str(cfg.get_config_path())}
+            for name, cfg in AGENTS.items()
         ]
     }
+
+
+# ── MCP endpoints (store-backed) ──────────────────────────────────────────
 
 
 @router.get("/mcp/{agent}")
 async def get_mcp_servers(agent: str):
     _check_available(agent)
-    cfg = _get_config(agent)
-    return {"servers": cfg.get_mcp_servers()}
+    return mcp_store.load(agent)
 
 
 @router.post("/mcp/{agent}")
@@ -57,14 +66,22 @@ async def add_mcp_server(agent: str, req: AddMcpRequest):
     cfg = _get_config(agent)
     from carrot_switch.backup import backup_config
     backup_config(agent, cfg.get_config_path())
-    server = {"type": req.type, "enabled": True}
-    if req.command:
-        server["command"] = req.command
+
+    # Normalize command: string → array
+    command = req.command
+    if isinstance(command, str):
+        command = command.split()
+
+    server: dict = {"type": req.type}
+    if command:
+        server["command"] = command
     if req.url:
         server["url"] = req.url
     if req.environment:
         server["environment"] = req.environment
-    cfg.add_mcp_server(req.name, server)
+
+    mcp_store.add_server(agent, req.name, server)
+    mcp_store.sync_to_agent(agent)
     return {"ok": True}
 
 
@@ -74,14 +91,21 @@ async def update_mcp_server(agent: str, name: str, req: AddMcpRequest):
     cfg = _get_config(agent)
     from carrot_switch.backup import backup_config
     backup_config(agent, cfg.get_config_path())
-    server = {"type": req.type, "enabled": cfg.get_mcp_servers().get(name, {}).get("enabled", True)}
-    if req.command:
-        server["command"] = req.command
+
+    command = req.command
+    if isinstance(command, str):
+        command = command.split()
+
+    server: dict = {"type": req.type}
+    if command:
+        server["command"] = command
     if req.url:
         server["url"] = req.url
     if req.environment:
         server["environment"] = req.environment
-    cfg.update_mcp_server(name, server)
+
+    mcp_store.update_server(agent, name, server)
+    mcp_store.sync_to_agent(agent)
     return {"ok": True}
 
 
@@ -91,18 +115,20 @@ async def delete_mcp_server(agent: str, name: str):
     cfg = _get_config(agent)
     from carrot_switch.backup import backup_config
     backup_config(agent, cfg.get_config_path())
-    cfg.delete_mcp_server(name)
+
+    mcp_store.delete_server(agent, name)
+    mcp_store.sync_to_agent(agent)
     return {"ok": True}
 
 
 @router.patch("/mcp/{agent}/{name}/toggle")
 async def toggle_mcp_server(agent: str, name: str):
     _check_available(agent)
-    cfg = _get_config(agent)
-    from carrot_switch.backup import backup_config
-    backup_config(agent, cfg.get_config_path())
-    enabled = cfg.toggle_mcp_server(name)
+    enabled = mcp_store.toggle_server(agent, name)
     return {"enabled": enabled}
+
+
+# ── Skill endpoints ────────────────────────────────────────────────────────
 
 
 @router.get("/skills/{agent}")
@@ -118,6 +144,10 @@ async def install_skill(agent: str, req: InstallSkillRequest):
     try:
         if req.source_type == "local":
             skill_mgr.install_from_local(agent, req.source)
+        elif req.source_type == "zip":
+            skill_mgr.install_from_zip(agent, req.source)
+        elif req.source_type == "url":
+            skill_mgr.install_from_url(agent, req.source)
         else:
             skill_mgr.install_from_github(agent, req.source)
     except (ValueError, FileExistsError) as e:
