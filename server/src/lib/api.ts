@@ -1,18 +1,28 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { existsSync, statSync } from "fs";
+import { existsSync, statSync, readdirSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
 import * as oc from "./config/opencode.js";
 import * as mc from "./config/mimocode.js";
 import * as cl from "./config/claude.js";
-import * as mcpStore from "./store/mcp.js";
-import * as skillManager from "./skill/manager.js";
+import * as repoMcp from "./repository/mcp.js";
+import * as repoSkill from "./repository/skill.js";
+import * as agentMcp from "./agent/mcp.js";
+import * as agentSkill from "./agent/skill.js";
 import * as builtinSkills from "./skill/builtin.js";
-import { backupConfig } from "./backup.js";
-import type { AddMcpPayload, InstallSkillPayload } from "@carrot-switch/shared";
+import type { RepositoryMcp, McpType, SkillSourceType, UpdateRepositoryMcpPayload, EnablePayload } from "@carrot-switch/shared";
 
 const AddMcpSchema = z.object({
   name: z.string(),
-  type: z.string().default("local") as z.ZodType<AddMcpPayload["type"]>,
+  type: z.string().default("local") as z.ZodType<McpType>,
+  command: z.union([z.string(), z.array(z.string())]).nullable().optional(),
+  url: z.string().nullable().optional(),
+  environment: z.record(z.string()).nullable().optional(),
+});
+
+const UpdateMcpSchema = z.object({
+  type: z.string().optional() as z.ZodType<McpType | undefined>,
   command: z.union([z.string(), z.array(z.string())]).nullable().optional(),
   url: z.string().nullable().optional(),
   environment: z.record(z.string()).nullable().optional(),
@@ -20,7 +30,11 @@ const AddMcpSchema = z.object({
 
 const InstallSkillSchema = z.object({
   source: z.string(),
-  sourceType: z.string().default("github") as z.ZodType<InstallSkillPayload["sourceType"]>,
+  sourceType: z.string().default("github") as z.ZodType<SkillSourceType>,
+});
+
+const EnableSchema = z.object({
+  enabled: z.boolean(),
 });
 
 const AGENTS: Record<string, any> = {
@@ -54,11 +68,9 @@ export function createApi() {
     if (err instanceof HttpException) {
       return c.json({ detail: err.message }, err.status as any);
     }
-    // Handle Zod validation errors
     if (err.name === "ZodError") {
       return c.json({ detail: err.message }, 400 as any);
     }
-    // Handle store errors (e.g., "not found")
     if (err.message?.includes("not found")) {
       return c.json({ detail: err.message }, 404 as any);
     }
@@ -66,7 +78,8 @@ export function createApi() {
     return c.json({ detail: "Internal server error" }, 500);
   });
 
-  // Agents
+  // ── Agents ──────────────────────────────────────────────────────────────────
+
   app.get("/api/agents", (c) => {
     return c.json({
       agents: Object.entries(AGENTS).map(([name, cfg]) => ({
@@ -77,163 +90,342 @@ export function createApi() {
     });
   });
 
-  // MCP - list
-  app.get("/api/mcp/:agent", (c) => {
-    const agent = c.req.param("agent");
-    checkAvailable(agent);
-    return c.json(mcpStore.load(agent));
+  // ── Repository MCP ──────────────────────────────────────────────────────────
+
+  app.get("/api/repository/mcp", (c) => {
+    return c.json({ servers: repoMcp.listAll() });
   });
 
-  // MCP - add
-  app.post("/api/mcp/:agent", async (c) => {
-    const agent = c.req.param("agent");
-    checkAvailable(agent);
-    const cfg = getConfig(agent);
+  app.post("/api/repository/mcp", async (c) => {
     const body = await c.req.json();
     const parsed = AddMcpSchema.parse(body);
 
-    backupConfig(agent, cfg.get_config_path());
+    if (repoMcp.exists(parsed.name)) {
+      throw new HttpException(400, `MCP server '${parsed.name}' already exists in repository`);
+    }
 
     let command = parsed.command;
     if (typeof command === "string") {
       command = command.split(/\s+/);
     }
 
-    const server: Record<string, any> = { type: parsed.type };
-    if (command && command.length > 0) server.command = command;
-    if (parsed.url) server.url = parsed.url;
-    if (parsed.environment) server.environment = parsed.environment;
+    const mcp: RepositoryMcp = {
+      name: parsed.name,
+      type: parsed.type,
+      addedAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+      source: "manual",
+    };
+    if (command && command.length > 0) mcp.command = command;
+    if (parsed.url) mcp.url = parsed.url;
+    if (parsed.environment) mcp.environment = parsed.environment;
 
-    mcpStore.addServer(agent, parsed.name, server);
-    mcpStore.syncToAgent(agent);
+    repoMcp.add(mcp);
     return c.json({ ok: true });
   });
 
-  // MCP - update
-  app.put("/api/mcp/:agent/:name", async (c) => {
-    const agent = c.req.param("agent");
+  app.put("/api/repository/mcp/:name", async (c) => {
     const name = c.req.param("name");
-    checkAvailable(agent);
-    const cfg = getConfig(agent);
     const body = await c.req.json();
-    const parsed = AddMcpSchema.parse(body);
-
-    backupConfig(agent, cfg.get_config_path());
+    const parsed = UpdateMcpSchema.parse(body);
 
     let command = parsed.command;
     if (typeof command === "string") {
       command = command.split(/\s+/);
     }
 
-    const server: Record<string, any> = { type: parsed.type };
-    if (command && command.length > 0) server.command = command;
-    if (parsed.url) server.url = parsed.url;
-    if (parsed.environment) server.environment = parsed.environment;
+    const patch: Partial<RepositoryMcp> = {};
+    if (parsed.type) patch.type = parsed.type;
+    if (command !== undefined) patch.command = command;
+    if (parsed.url !== undefined) patch.url = parsed.url;
+    if (parsed.environment !== undefined) patch.environment = parsed.environment;
 
-    mcpStore.updateServer(agent, name, server);
-    mcpStore.syncToAgent(agent);
+    const updated = repoMcp.update(name, patch);
+
+    // Sync to all agents that have this MCP enabled
+    for (const agent of Object.keys(AGENTS)) {
+      if (agentMcp.isEnabled(agent, name)) {
+        try {
+          agentMcp.enable(agent, name); // re-enable to sync updated config
+        } catch {
+          // agent may not be available
+        }
+      }
+    }
+
     return c.json({ ok: true });
   });
 
-  // MCP - delete
-  app.delete("/api/mcp/:agent/:name", (c) => {
-    const agent = c.req.param("agent");
+  app.delete("/api/repository/mcp/:name", (c) => {
     const name = c.req.param("name");
-    checkAvailable(agent);
-    const cfg = getConfig(agent);
 
-    backupConfig(agent, cfg.get_config_path());
-    mcpStore.deleteServer(agent, name);
-    mcpStore.syncToAgent(agent);
+    // Disable from all agents first
+    for (const agent of Object.keys(AGENTS)) {
+      if (agentMcp.isEnabled(agent, name)) {
+        try {
+          agentMcp.disable(agent, name);
+        } catch {
+          // agent may not be available
+        }
+      }
+    }
+
+    repoMcp.remove(name);
     return c.json({ ok: true });
   });
 
-  // MCP - toggle
-  app.patch("/api/mcp/:agent/:name/toggle", (c) => {
-    const agent = c.req.param("agent");
-    const name = c.req.param("name");
-    checkAvailable(agent);
-    const enabled = mcpStore.toggleServer(agent, name);
-    return c.json({ enabled });
+  // ── Repository Skills ───────────────────────────────────────────────────────
+
+  app.get("/api/repository/skills", (c) => {
+    return c.json({ skills: repoSkill.listAll() });
   });
 
-  // Skills - list
-  app.get("/api/skills/:agent", (c) => {
-    const agent = c.req.param("agent");
-    checkAvailable(agent);
-    const skills = skillManager.listInstalled(agent);
-    return c.json({ skills });
-  });
-
-  // Skills - install
-  app.post("/api/skills/:agent/install", async (c) => {
-    const agent = c.req.param("agent");
-    checkAvailable(agent);
+  app.post("/api/repository/skills/install", async (c) => {
     const body = await c.req.json();
     const parsed = InstallSkillSchema.parse(body);
 
-    try {
-      if (parsed.sourceType === "local") {
-        skillManager.installFromLocal(agent, parsed.source);
-      } else if (parsed.sourceType === "zip") {
-        await skillManager.installFromZip(agent, parsed.source);
-      } else if (parsed.sourceType === "url") {
-        await skillManager.installFromUrl(agent, parsed.source);
-      } else {
-        await skillManager.installFromGithub(agent, parsed.source);
+    const name = parsed.source.split(/[\\/]/).pop()?.replace(".git", "") || "unknown";
+
+    if (repoSkill.exists(name)) {
+      throw new HttpException(400, `Skill '${name}' already exists in repository`);
+    }
+
+    // Install to repository skills dir
+    const repoSkillsDir = repoSkill.getSkillPath(name);
+    const { existsSync, mkdirSync } = await import("fs");
+
+    if (parsed.sourceType === "local") {
+      const sourcePath = parsed.source;
+      if (!existsSync(sourcePath)) {
+        throw new HttpException(400, `Source path does not exist: ${sourcePath}`);
       }
-    } catch (e: any) {
-      if (e.message?.includes("already exists")) {
-        throw new HttpException(400, e.message);
+      if (!existsSync(join(sourcePath, "SKILL.md"))) {
+        throw new HttpException(400, `Source directory does not contain SKILL.md: ${sourcePath}`);
       }
-      if (e.message?.includes("not found") || e.message?.includes("not a directory")) {
-        throw new HttpException(400, e.message);
+      repoSkill.ensureSkillDir();
+      const { cpSync } = await import("fs");
+      cpSync(sourcePath, repoSkillsDir, { recursive: true });
+    } else if (parsed.sourceType === "github") {
+      let repoUrl = parsed.source;
+      if (!repoUrl.startsWith("http")) {
+        repoUrl = `https://github.com/${repoUrl}.git`;
       }
-      throw e;
+      repoSkill.ensureSkillDir();
+      mkdirSync(repoSkillsDir, { recursive: true });
+      const proc = Bun.spawn(["git", "clone", repoUrl, repoSkillsDir]);
+      await proc.exited;
+      if (proc.exitCode !== 0) {
+        throw new HttpException(500, `git clone failed with exit code ${proc.exitCode}`);
+      }
+    } else if (parsed.sourceType === "zip") {
+      const { mkdtempSync, rmSync } = await import("fs");
+      const { tmpdir } = await import("os");
+      const { default: AdmZip } = await import("adm-zip");
+
+      const tmpDir = mkdtempSync(join(tmpdir(), "carrot-"));
+      try {
+        let zipPath: string;
+        if (parsed.source.startsWith("http")) {
+          zipPath = join(tmpDir, "skill.zip");
+          const res = await fetch(parsed.source);
+          if (!res.ok) throw new HttpException(500, `Download failed: ${res.status}`);
+          const buffer = Buffer.from(await res.arrayBuffer());
+          await Bun.write(zipPath, buffer);
+        } else {
+          zipPath = parsed.source;
+        }
+
+        const extractDir = join(tmpDir, "extracted");
+        const zip = new AdmZip(zipPath);
+        zip.extractAllTo(extractDir, true);
+
+        // Find skill dir with SKILL.md
+        const skillDir = findSkillMd(extractDir);
+        if (!skillDir) {
+          throw new HttpException(400, "ZIP does not contain a directory with SKILL.md");
+        }
+
+        repoSkill.ensureSkillDir();
+        const { cpSync } = await import("fs");
+        cpSync(skillDir, repoSkillsDir, { recursive: true });
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    } else if (parsed.sourceType === "url") {
+      const { mkdtempSync, mkdirSync, rmSync } = await import("fs");
+      const { tmpdir } = await import("os");
+
+      let ext = ".zip";
+      if (parsed.source.includes(".tar.gz") || parsed.source.includes(".tgz")) ext = ".tar.gz";
+      else if (parsed.source.includes(".tar")) ext = ".tar";
+
+      const tmpDir = mkdtempSync(join(tmpdir(), "carrot-"));
+      try {
+        const archivePath = join(tmpDir, `skill${ext}`);
+        const res = await fetch(parsed.source);
+        if (!res.ok) throw new HttpException(500, `Download failed: ${res.status}`);
+        const buffer = Buffer.from(await res.arrayBuffer());
+        await Bun.write(archivePath, buffer);
+
+        const extractDir = join(tmpDir, "extracted");
+        mkdirSync(extractDir);
+
+        if (ext === ".zip") {
+          const { default: AdmZip } = await import("adm-zip");
+          const zip = new AdmZip(archivePath);
+          zip.extractAllTo(extractDir, true);
+        } else {
+          const tar = await import("tar");
+          await tar.extract({ file: archivePath, cwd: extractDir });
+        }
+
+        const skillDir = findSkillMd(extractDir);
+        if (!skillDir) {
+          throw new HttpException(400, "Downloaded archive does not contain a directory with SKILL.md");
+        }
+
+        repoSkill.ensureSkillDir();
+        const { cpSync } = await import("fs");
+        cpSync(skillDir, repoSkillsDir, { recursive: true });
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    }
+
+    repoSkill.add(name, parsed.source, parsed.sourceType);
+    return c.json({ ok: true });
+  });
+
+  app.delete("/api/repository/skills/:name", (c) => {
+    const name = c.req.param("name");
+
+    // Disable from all agents first
+    for (const agent of Object.keys(AGENTS)) {
+      if (agentSkill.isEnabled(agent, name)) {
+        try {
+          agentSkill.disable(agent, name);
+        } catch {
+          // agent may not be available
+        }
+      }
+    }
+
+    repoSkill.remove(name);
+    return c.json({ ok: true });
+  });
+
+  // ── Import from agent ───────────────────────────────────────────────────────
+
+  app.post("/api/repository/import/:agent", async (c) => {
+    const agent = c.req.param("agent");
+    checkAvailable(agent);
+    const cfg = getConfig(agent);
+
+    // Import MCP servers
+    const agentServers = cfg.get_mcp_servers();
+    for (const [name, server] of Object.entries(agentServers)) {
+      if (!repoMcp.exists(name)) {
+        const s = server as Record<string, any>;
+        const mcp: RepositoryMcp = {
+          name,
+          type: s.type || "local",
+          addedAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+          source: "import",
+        };
+        if (s.command) mcp.command = s.command;
+        if (s.url) mcp.url = s.url;
+        if (s.environment) mcp.environment = s.environment;
+        repoMcp.add(mcp);
+      }
+
+      // Enable for this agent
+      if (!agentMcp.isEnabled(agent, name)) {
+        try {
+          agentMcp.enable(agent, name);
+        } catch {
+          // ignore sync errors
+        }
+      }
     }
 
     return c.json({ ok: true });
   });
 
-  // Skills - uninstall
-  app.delete("/api/skills/:agent/:name", (c) => {
+  // ── Agent MCP enable/disable ────────────────────────────────────────────────
+
+  app.get("/api/agents/:agent/mcp", (c) => {
+    const agent = c.req.param("agent");
+    checkAvailable(agent);
+    const enabled = agentMcp.getEnabled(agent);
+    return c.json({ enabled });
+  });
+
+  app.post("/api/agents/:agent/mcp/:name/enable", async (c) => {
     const agent = c.req.param("agent");
     const name = c.req.param("name");
-    checkAvailable(agent);
+    const body = await c.req.json();
+    const parsed = EnableSchema.parse(body);
 
-    try {
-      skillManager.uninstall(agent, name);
-    } catch (e: any) {
-      if (e.message?.includes("not found")) {
-        throw new HttpException(404, e.message);
-      }
-      throw e;
+    if (parsed.enabled) {
+      agentMcp.enable(agent, name);
+    } else {
+      agentMcp.disable(agent, name);
     }
 
     return c.json({ ok: true });
   });
 
-  // Skills - toggle permission
-  app.patch("/api/skills/:agent/:name/permission", (c) => {
+  app.post("/api/agents/:agent/mcp/toggle-all", async (c) => {
     const agent = c.req.param("agent");
-    const name = c.req.param("name");
-    checkAvailable(agent);
-    const allowed = skillManager.togglePermission(agent, name);
-    return c.json({ allowed });
+    const body = await c.req.json();
+    const parsed = EnableSchema.parse(body);
+
+    agentMcp.toggleAll(agent, parsed.enabled);
+    return c.json({ ok: true });
   });
 
-  // ── Builtin Skills (read-only, permission toggle only) ──────────────────────
+  // ── Agent Skills enable/disable ─────────────────────────────────────────────
 
-  // Builtin Skills - list
-  app.get("/api/builtin-skills/:agent", (c) => {
+  app.get("/api/agents/:agent/skills", (c) => {
+    const agent = c.req.param("agent");
+    checkAvailable(agent);
+    const enabled = agentSkill.getEnabled(agent);
+    return c.json({ enabled });
+  });
+
+  app.post("/api/agents/:agent/skills/:name/enable", async (c) => {
+    const agent = c.req.param("agent");
+    const name = c.req.param("name");
+    const body = await c.req.json();
+    const parsed = EnableSchema.parse(body);
+
+    if (parsed.enabled) {
+      agentSkill.enable(agent, name);
+    } else {
+      agentSkill.disable(agent, name);
+    }
+
+    return c.json({ ok: true });
+  });
+
+  app.post("/api/agents/:agent/skills/toggle-all", async (c) => {
+    const agent = c.req.param("agent");
+    const body = await c.req.json();
+    const parsed = EnableSchema.parse(body);
+
+    agentSkill.toggleAll(agent, parsed.enabled);
+    return c.json({ ok: true });
+  });
+
+  // ── Builtin Skills (read-only, permission toggle) ───────────────────────────
+
+  app.get("/api/agents/:agent/builtin-skills", (c) => {
     const agent = c.req.param("agent");
     checkAvailable(agent);
     const skills = builtinSkills.listBuiltinSkills(agent);
     return c.json({ skills });
   });
 
-  // Builtin Skills - toggle permission (no install/uninstall)
-  app.patch("/api/builtin-skills/:agent/:name/permission", (c) => {
+  app.post("/api/agents/:agent/builtin-skills/:name/toggle", async (c) => {
     const agent = c.req.param("agent");
     const name = c.req.param("name");
     checkAvailable(agent);
@@ -242,4 +434,20 @@ export function createApi() {
   });
 
   return app;
+}
+
+function findSkillMd(dir: string): string | null {
+  if (existsSync(join(dir, "SKILL.md"))) return dir;
+  for (const entry of readdirSync(dir)) {
+    const entryPath = join(dir, entry);
+    try {
+      if (statSync(entryPath).isDirectory()) {
+        const found = findSkillMd(entryPath);
+        if (found) return found;
+      }
+    } catch {
+      // skip
+    }
+  }
+  return null;
 }

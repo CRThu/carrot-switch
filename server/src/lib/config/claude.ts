@@ -3,19 +3,31 @@ import { homedir } from "os";
 import { existsSync } from "fs";
 import { readJsonc, writeJsonc } from "../jsonc.js";
 
-const CONFIG_PATH = join(homedir(), ".claude.json");
-const SKILLS_DIR = join(homedir(), ".claude", "skills");
+let _configPathOverride: string | null = null;
+
+export function _setConfigPathForTesting(path: string | null) {
+  _configPathOverride = path;
+}
+
+function getConfigPath(): string {
+  if (_configPathOverride) return _configPathOverride;
+  return join(homedir(), ".claude.json");
+}
+
+function getSkillsDirPath(): string {
+  return join(homedir(), ".claude", "skills");
+}
 
 export function get_config_path(): string {
-  return CONFIG_PATH;
+  return getConfigPath();
 }
 
 export function get_skills_dir(): string {
-  return SKILLS_DIR;
+  return getSkillsDirPath();
 }
 
 export function is_available(): boolean {
-  return existsSync(CONFIG_PATH);
+  return existsSync(getConfigPath());
 }
 
 function normalizeFromClaude(server: Record<string, any>): Record<string, any> {
@@ -67,7 +79,7 @@ function toClaudeFormat(server: Record<string, any>): Record<string, any> {
 }
 
 export function get_mcp_servers(): Record<string, any> {
-  const cfg = readJsonc(CONFIG_PATH);
+  const cfg = readJsonc(getConfigPath());
   const rawServers = cfg.mcpServers || {};
   const normalized: Record<string, any> = {};
   for (const [name, server] of Object.entries(rawServers)) {
@@ -77,29 +89,32 @@ export function get_mcp_servers(): Record<string, any> {
 }
 
 export function add_mcp_server(name: string, server: Record<string, any>): void {
-  const cfg = readJsonc(CONFIG_PATH);
+  const configPath = getConfigPath();
+  const cfg = readJsonc(configPath);
   if (!cfg.mcpServers) cfg.mcpServers = {};
   cfg.mcpServers[name] = toClaudeFormat(server);
-  writeJsonc(CONFIG_PATH, cfg);
+  writeJsonc(configPath, cfg);
 }
 
 export function update_mcp_server(name: string, server: Record<string, any>): void {
-  const cfg = readJsonc(CONFIG_PATH);
+  const configPath = getConfigPath();
+  const cfg = readJsonc(configPath);
   if (!cfg.mcpServers || !(name in cfg.mcpServers)) {
     throw new Error(`MCP server '${name}' not found`);
   }
   cfg.mcpServers[name] = toClaudeFormat(server);
-  writeJsonc(CONFIG_PATH, cfg);
+  writeJsonc(configPath, cfg);
 }
 
 export function delete_mcp_server(name: string): void {
-  const cfg = readJsonc(CONFIG_PATH);
+  const configPath = getConfigPath();
+  const cfg = readJsonc(configPath);
   const servers = cfg.mcpServers || {};
   if (!(name in servers)) {
     throw new Error(`MCP server '${name}' not found`);
   }
   delete servers[name];
-  writeJsonc(CONFIG_PATH, cfg);
+  writeJsonc(configPath, cfg);
 }
 
 export function get_skills_permission(): Record<string, string> {

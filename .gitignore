@@ -4,4 +4,7 @@ node_modules/
 # Build output
 dist/
 
+# Frontend build artifacts
+server/src/web/static/
+
 **/*.log

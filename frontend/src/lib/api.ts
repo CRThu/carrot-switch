@@ -5,6 +5,9 @@ import type {
   Skill,
   InstallSkillPayload,
   BuiltinSkill,
+  RepositoryMcp,
+  SkillMeta,
+  AgentEnableList,
 } from "@carrot-switch/shared";
 import { API } from "@carrot-switch/shared";
 
@@ -55,39 +58,60 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
+  // ── Agents ──────────────────────────────────────────────────────────────────
   getAgents: () => request<{ agents: Agent[] }>('GET', API.agents),
 
-  getMcpServers: (agent: string) =>
-    request<{ servers: Record<string, McpServer> }>('GET', API.mcp(agent)),
+  // ── Repository MCP ──────────────────────────────────────────────────────────
+  getRepositoryMcp: () =>
+    request<{ servers: Record<string, RepositoryMcp> }>('GET', API.repositoryMcp),
 
-  addMcpServer: (agent: string, data: AddMcpPayload) =>
-    request<{ ok: boolean }>('POST', API.mcp(agent), data),
+  addRepositoryMcp: (data: AddMcpPayload) =>
+    request<{ ok: boolean }>('POST', API.repositoryMcp, data),
 
-  updateMcpServer: (agent: string, name: string, data: AddMcpPayload) =>
-    request<{ ok: boolean }>('PUT', API.mcpServer(agent, name), data),
+  updateRepositoryMcp: (name: string, data: Partial<AddMcpPayload>) =>
+    request<{ ok: boolean }>('PUT', API.repositoryMcpItem(name), data),
 
-  deleteMcpServer: (agent: string, name: string) =>
-    request<{ ok: boolean }>('DELETE', API.mcpServer(agent, name)),
+  deleteRepositoryMcp: (name: string) =>
+    request<{ ok: boolean }>('DELETE', API.repositoryMcpItem(name)),
 
-  toggleMcpServer: (agent: string, name: string) =>
-    request<{ enabled: boolean }>('PATCH', API.mcpToggle(agent, name)),
+  // ── Repository Skills ───────────────────────────────────────────────────────
+  getRepositorySkills: () =>
+    request<{ skills: SkillMeta[] }>('GET', API.repositorySkills),
 
-  getSkills: (agent: string) =>
-    request<{ skills: Skill[] }>('GET', API.skills(agent)),
+  installRepositorySkill: (data: InstallSkillPayload) =>
+    request<{ ok: boolean }>('POST', API.repositorySkills + '/install', data),
 
-  installSkill: (agent: string, data: InstallSkillPayload) =>
-    request<{ ok: boolean }>('POST', API.skillInstall(agent), data),
+  deleteRepositorySkill: (name: string) =>
+    request<{ ok: boolean }>('DELETE', API.repositorySkillItem(name)),
 
-  uninstallSkill: (agent: string, name: string) =>
-    request<{ ok: boolean }>('DELETE', API.skill(agent, name)),
+  // ── Import from agent ───────────────────────────────────────────────────────
+  importFromAgent: (agent: string) =>
+    request<{ ok: boolean }>('POST', API.repositoryImport(agent)),
 
-  toggleSkillPermission: (agent: string, name: string) =>
-    request<{ allowed: boolean }>('PATCH', API.skillPermission(agent, name)),
+  // ── Agent MCP enable/disable ────────────────────────────────────────────────
+  getAgentMcpEnabled: (agent: string) =>
+    request<{ enabled: string[] }>('GET', API.agentMcp(agent)),
 
-  // Builtin Skills (read-only, permission toggle only)
+  enableAgentMcp: (agent: string, name: string, enabled: boolean) =>
+    request<{ ok: boolean }>('POST', API.agentMcpEnable(agent, name), { enabled }),
+
+  toggleAllAgentMcp: (agent: string, enabled: boolean) =>
+    request<{ ok: boolean }>('POST', API.agentMcpToggleAll(agent), { enabled }),
+
+  // ── Agent Skills enable/disable ─────────────────────────────────────────────
+  getAgentSkillsEnabled: (agent: string) =>
+    request<{ enabled: string[] }>('GET', API.agentSkills(agent)),
+
+  enableAgentSkill: (agent: string, name: string, enabled: boolean) =>
+    request<{ ok: boolean }>('POST', API.agentSkillEnable(agent, name), { enabled }),
+
+  toggleAllAgentSkills: (agent: string, enabled: boolean) =>
+    request<{ ok: boolean }>('POST', API.agentSkillToggleAll(agent), { enabled }),
+
+  // ── Builtin Skills (read-only, permission toggle) ───────────────────────────
   getBuiltinSkills: (agent: string) =>
     request<{ skills: BuiltinSkill[] }>('GET', API.builtinSkills(agent)),
 
   toggleBuiltinSkillPermission: (agent: string, name: string) =>
-    request<{ allowed: boolean }>('PATCH', API.builtinSkillPermission(agent, name))
+    request<{ allowed: boolean }>('POST', API.builtinSkillToggle(agent, name), { enabled: true }),
 };

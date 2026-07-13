@@ -1,17 +1,28 @@
-import type { Agent, McpServer, AddMcpPayload, Skill, InstallSkillPayload, BuiltinSkill } from './types.js';
+import type { Agent, McpServer, AddMcpPayload, Skill, InstallSkillPayload, BuiltinSkill, RepositoryMcp, SkillMeta, AgentEnableList } from './types.js';
 
 // API Paths
 export const API = {
+  // Agents
   agents: '/api/agents',
-  mcp: (agent: string) => `/api/mcp/${agent}`,
-  mcpServer: (agent: string, name: string) => `/api/mcp/${agent}/${name}`,
-  mcpToggle: (agent: string, name: string) => `/api/mcp/${agent}/${name}/toggle`,
-  skills: (agent: string) => `/api/skills/${agent}`,
-  skillInstall: (agent: string) => `/api/skills/${agent}/install`,
-  skill: (agent: string, name: string) => `/api/skills/${agent}/${name}`,
-  skillPermission: (agent: string, name: string) => `/api/skills/${agent}/${name}/permission`,
-  builtinSkills: (agent: string) => `/api/builtin-skills/${agent}`,
-  builtinSkillPermission: (agent: string, name: string) => `/api/builtin-skills/${agent}/${name}/permission`,
+
+  // ── Repository ────────────────────────────────────────────────────────────
+  repositoryMcp: '/api/repository/mcp',
+  repositoryMcpItem: (name: string) => `/api/repository/mcp/${name}`,
+  repositorySkills: '/api/repository/skills',
+  repositorySkillItem: (name: string) => `/api/repository/skills/${name}`,
+  repositoryImport: (agent: string) => `/api/repository/import/${agent}`,
+
+  // ── Agent enable/disable ──────────────────────────────────────────────────
+  agentMcp: (agent: string) => `/api/agents/${agent}/mcp`,
+  agentMcpEnable: (agent: string, name: string) => `/api/agents/${agent}/mcp/${name}/enable`,
+  agentMcpToggleAll: (agent: string) => `/api/agents/${agent}/mcp/toggle-all`,
+  agentSkills: (agent: string) => `/api/agents/${agent}/skills`,
+  agentSkillEnable: (agent: string, name: string) => `/api/agents/${agent}/skills/${name}/enable`,
+  agentSkillToggleAll: (agent: string) => `/api/agents/${agent}/skills/toggle-all`,
+
+  // ── Builtin Skills (read-only, permission toggle) ─────────────────────────
+  builtinSkills: (agent: string) => `/api/agents/${agent}/builtin-skills`,
+  builtinSkillToggle: (agent: string, name: string) => `/api/agents/${agent}/builtin-skills/${name}/toggle`,
 } as const;
 
 // Response types
@@ -40,4 +51,18 @@ export interface SkillsResponse {
 
 export interface BuiltinSkillsResponse {
   skills: BuiltinSkill[];
+}
+
+// Repository API
+export interface RepositoryMcpResponse {
+  servers: Record<string, RepositoryMcp>;
+}
+
+export interface RepositorySkillsResponse {
+  skills: SkillMeta[];
+}
+
+// Agent enable list API
+export interface AgentEnableListResponse {
+  enabled: AgentEnableList;
 }

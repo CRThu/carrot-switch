@@ -1,8 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { createApi } from "../lib/api.js";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
 
 const api = createApi();
 let server: any;
@@ -47,30 +44,30 @@ describe("API Endpoints", () => {
     });
   });
 
-  describe("GET /api/mcp/:agent", () => {
-    it("returns MCP servers for available agents", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/mcp/opencode`);
+  describe("Repository MCP CRUD", () => {
+    // Clean up test data before tests
+    const testNames = ["test-server-crud", "test-server-str", "test-remote-crud", "dup-test", "update-test-crud", "delete-test-crud", "enable-test"];
+
+    beforeAll(async () => {
+      for (const name of testNames) {
+        await fetch(`http://127.0.0.1:${port}/api/repository/mcp/${name}`, { method: "DELETE" });
+      }
+    });
+
+    it("lists repository MCP servers", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/mcp`);
       expect(res.ok).toBe(true);
       const data = await res.json();
       expect(data.servers).toBeDefined();
       expect(typeof data.servers).toBe("object");
     });
 
-    it("returns 404 for unknown agent", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/mcp/unknown`);
-      expect(res.status).toBe(404);
-      const data = await res.json();
-      expect(data.detail).toContain("Unknown agent");
-    });
-  });
-
-  describe("POST /api/mcp/:agent", () => {
-    it("adds MCP server with array command", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/mcp/opencode`, {
+    it("adds MCP server to repository", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/mcp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: "test-server-1",
+          name: "test-server-crud",
           type: "local",
           command: ["python", "-m", "server"],
         }),
@@ -80,12 +77,12 @@ describe("API Endpoints", () => {
       expect(data.ok).toBe(true);
     });
 
-    it("adds MCP server with string command (splits to array)", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/mcp/opencode`, {
+    it("adds MCP server with string command", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/mcp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: "test-server-2",
+          name: "test-server-str",
           type: "local",
           command: "python -m server",
         }),
@@ -93,12 +90,12 @@ describe("API Endpoints", () => {
       expect(res.ok).toBe(true);
     });
 
-    it("adds MCP server with url", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/mcp/opencode`, {
+    it("adds remote MCP server with url", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/mcp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: "test-remote",
+          name: "test-remote-crud",
           type: "remote",
           url: "http://localhost:3000",
         }),
@@ -106,179 +103,239 @@ describe("API Endpoints", () => {
       expect(res.ok).toBe(true);
     });
 
-    it("adds MCP server with environment", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/mcp/opencode`, {
+    it("returns 400 for duplicate name", async () => {
+      // Add first
+      await fetch(`http://127.0.0.1:${port}/api/repository/mcp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "test-env",
-          type: "local",
-          command: ["node"],
-          environment: { NODE_ENV: "production" },
-        }),
+        body: JSON.stringify({ name: "dup-test", type: "local" }),
       });
-      expect(res.ok).toBe(true);
-    });
-
-    it("validates request body", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/mcp/opencode`, {
+      // Add duplicate
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/mcp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          // missing required 'name' field
-          type: "local",
-        }),
+        body: JSON.stringify({ name: "dup-test", type: "local" }),
       });
       expect(res.status).toBe(400);
     });
 
+    it("updates MCP server in repository", async () => {
+      // Add first
+      await fetch(`http://127.0.0.1:${port}/api/repository/mcp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "update-test-crud", type: "local", command: ["old"] }),
+      });
+
+      // Update
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/mcp/update-test-crud`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: ["new"] }),
+      });
+      expect(res.ok).toBe(true);
+    });
+
+    it("returns 404 for unknown server update", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/mcp/nonexistent`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: ["new"] }),
+      });
+      expect(res.status).toBe(404);
+    });
+
+    it("deletes MCP server from repository", async () => {
+      // Add first
+      await fetch(`http://127.0.0.1:${port}/api/repository/mcp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "delete-test-crud", type: "local" }),
+      });
+
+      // Delete
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/mcp/delete-test-crud`, {
+        method: "DELETE",
+      });
+      expect(res.ok).toBe(true);
+    });
+
+    it("returns 404 for unknown server delete", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/mcp/nonexistent`, {
+        method: "DELETE",
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe("Agent MCP enable/disable", () => {
+    it("lists enabled MCP for agent", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/mcp`);
+      expect(res.ok).toBe(true);
+      const data = await res.json();
+      expect(data.enabled).toBeDefined();
+      expect(Array.isArray(data.enabled)).toBe(true);
+    });
+
+    it("enables MCP for agent", async () => {
+      // Add to repo first
+      await fetch(`http://127.0.0.1:${port}/api/repository/mcp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "enable-test", type: "local", command: ["node"] }),
+      });
+
+      // Enable for agent
+      const res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/mcp/enable-test/enable`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: true }),
+      });
+      expect(res.ok).toBe(true);
+    });
+
+    it("disables MCP for agent", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/mcp/enable-test/enable`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: false }),
+      });
+      expect(res.ok).toBe(true);
+    });
+
+    it("toggle-all enables all MCP", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/mcp/toggle-all`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: true }),
+      });
+      expect(res.ok).toBe(true);
+    });
+
+    it("toggle-all disables all MCP", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/mcp/toggle-all`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: false }),
+      });
+      expect(res.ok).toBe(true);
+    });
+
     it("returns 404 for unknown agent", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/mcp/unknown`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "test", type: "local" }),
-      });
+      const res = await fetch(`http://127.0.0.1:${port}/api/agents/unknown/mcp`);
       expect(res.status).toBe(404);
     });
   });
 
-  describe("PUT /api/mcp/:agent/:name", () => {
-    it("updates existing MCP server", async () => {
-      // First add a server
-      await fetch(`http://127.0.0.1:${port}/api/mcp/opencode`, {
+  describe("Repository Skills", () => {
+    it("lists repository skills", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/skills`);
+      expect(res.ok).toBe(true);
+      const data = await res.json();
+      expect(data.skills).toBeDefined();
+      expect(Array.isArray(data.skills)).toBe(true);
+    });
+  });
+
+  describe("Agent Skills enable/disable", () => {
+    it("lists enabled skills for agent", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/skills`);
+      expect(res.ok).toBe(true);
+      const data = await res.json();
+      expect(data.enabled).toBeDefined();
+      expect(Array.isArray(data.enabled)).toBe(true);
+    });
+
+    it("returns 404 for unknown agent on skills", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/agents/unknown/skills`);
+      expect(res.status).toBe(404);
+    });
+
+    it("toggle-all skills enables all", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/skills/toggle-all`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "update-test",
-          type: "local",
-          command: ["old-command"],
-        }),
-      });
-
-      // Then update it
-      const res = await fetch(`http://127.0.0.1:${port}/api/mcp/opencode/update-test`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "update-test",
-          type: "local",
-          command: ["new-command"],
-        }),
+        body: JSON.stringify({ enabled: true }),
       });
       expect(res.ok).toBe(true);
     });
 
-    it("returns 404 for unknown server", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/mcp/opencode/nonexistent`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "nonexistent",
-          type: "local",
-        }),
-      });
-      expect(res.status).toBe(404);
-    });
-  });
-
-  describe("DELETE /api/mcp/:agent/:name", () => {
-    it("deletes existing MCP server", async () => {
-      // First add a server
-      await fetch(`http://127.0.0.1:${port}/api/mcp/opencode`, {
+    it("toggle-all skills disables all", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/skills/toggle-all`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "delete-test",
-          type: "local",
-        }),
-      });
-
-      // Then delete it
-      const res = await fetch(`http://127.0.0.1:${port}/api/mcp/opencode/delete-test`, {
-        method: "DELETE",
+        body: JSON.stringify({ enabled: false }),
       });
       expect(res.ok).toBe(true);
     });
-
-    it("returns 404 for unknown server", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/mcp/opencode/nonexistent`, {
-        method: "DELETE",
-      });
-      expect(res.status).toBe(404);
-    });
   });
 
-  describe("PATCH /api/mcp/:agent/:name/toggle", () => {
-    it("toggles MCP server enabled state", async () => {
-      // First add a server
-      await fetch(`http://127.0.0.1:${port}/api/mcp/opencode`, {
+  describe("Import from agent", () => {
+    it("imports MCP from agent to repository", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/import/opencode`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "toggle-test",
-          type: "local",
-        }),
-      });
-
-      // Toggle it
-      const res = await fetch(`http://127.0.0.1:${port}/api/mcp/opencode/toggle-test/toggle`, {
-        method: "PATCH",
       });
       expect(res.ok).toBe(true);
       const data = await res.json();
-      expect(typeof data.enabled).toBe("boolean");
+      expect(data.ok).toBe(true);
     });
 
-    it("returns 404 for unknown server", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/mcp/opencode/nonexistent/toggle`, {
-        method: "PATCH",
+    it("returns 404 for unknown agent on import", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/import/unknown`, {
+        method: "POST",
       });
       expect(res.status).toBe(404);
     });
   });
 
-  describe("GET /api/skills/:agent", () => {
-    it("returns skills list", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/skills/opencode`);
+  describe("Builtin Skills", () => {
+    it("lists builtin skills", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/builtin-skills`);
       expect(res.ok).toBe(true);
       const data = await res.json();
       expect(data.skills).toBeDefined();
       expect(Array.isArray(data.skills)).toBe(true);
     });
 
-    it("returns 404 for unknown agent", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/skills/unknown`);
-      expect(res.status).toBe(404);
-    });
-  });
-
-  describe("PATCH /api/skills/:agent/:name/permission", () => {
-    it("toggles skill permission", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/skills/opencode/test-skill/permission`, {
-        method: "PATCH",
+    it("toggles builtin skill permission", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/builtin-skills/test/toggle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: true }),
       });
       expect(res.ok).toBe(true);
       const data = await res.json();
       expect(typeof data.allowed).toBe("boolean");
     });
+
+    it("returns 404 for unknown agent on builtin-skills", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/agents/unknown/builtin-skills`);
+      expect(res.status).toBe(404);
+    });
   });
 
   describe("Error handling", () => {
-    it("returns 404 for unknown agent on all endpoints", async () => {
-      const endpoints = [
-        { method: "GET", path: "/api/mcp/unknown" },
-        { method: "POST", path: "/api/mcp/unknown" },
-        { method: "GET", path: "/api/skills/unknown" },
-      ];
+    it("returns 404 for unknown agent on MCP", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/agents/unknown/mcp`);
+      expect(res.status).toBe(404);
+    });
 
-      for (const endpoint of endpoints) {
-        const res = await fetch(`http://127.0.0.1:${port}${endpoint.path}`, {
-          method: endpoint.method,
-          headers: endpoint.method === "POST" ? { "Content-Type": "application/json" } : undefined,
-          body: endpoint.method === "POST" ? JSON.stringify({ name: "test" }) : undefined,
-        });
-        expect(res.status).toBe(404);
-      }
+    it("validates request body for add MCP", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/mcp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "local" }), // missing name
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("validates enable body", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/mcp/test/enable`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}), // missing enabled
+      });
+      expect(res.status).toBe(400);
     });
   });
 });

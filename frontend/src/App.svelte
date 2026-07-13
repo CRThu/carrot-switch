@@ -1,57 +1,98 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api, NetworkError } from './lib/api';
-  import type { Agent, McpServer, Skill } from './lib/types';
+  import type { Agent, McpServer, Skill, BuiltinSkill } from './lib/types';
   import AgentTabs from './lib/components/AgentTabs.svelte';
-  import McpCard from './lib/components/McpCard.svelte';
-  import SkillCard from './lib/components/SkillCard.svelte';
-  import AddMcpDialog from './lib/components/AddMcpDialog.svelte';
-  import InstallSkillDialog from './lib/components/InstallSkillDialog.svelte';
+  import EnableToggle from './lib/components/EnableToggle.svelte';
+  import RepositoryTab from './lib/components/RepositoryTab.svelte';
 
   let agents: Agent[] = $state([]);
-  let selectedAgent: string = $state('opencode');
+  let selectedTab: string = $state('repository');
   let mcpServers: Record<string, McpServer> = $state({});
   let skills: Skill[] = $state([]);
-  let showAddMcp = $state(false);
-  let showInstallSkill = $state(false);
+  let builtinSkills: BuiltinSkill[] = $state([]);
+  let agentMcpEnabled: string[] = $state([]);
+  let agentSkillsEnabled: string[] = $state([]);
   let error: string | null = $state(null);
+  let refreshKey = $state(0);
 
   async function loadAgents() {
     const res = await api.getAgents();
     agents = res.agents;
-    if (agents.length > 0 && !agents.find(a => a.name === selectedAgent && a.available)) {
-      selectedAgent = agents.find(a => a.available)?.name || '';
+    if (agents.length > 0 && !agents.find(a => a.name === selectedTab && a.available)) {
+      const firstAvailable = agents.find(a => a.available);
+      selectedTab = firstAvailable ? firstAvailable.name : 'repository';
     }
   }
 
-  async function loadMcpServers() {
-    if (!selectedAgent) return;
+  async function loadAgentData() {
+    if (!selectedTab || selectedTab === 'repository') return;
     try {
-      const res = await api.getMcpServers(selectedAgent);
-      mcpServers = res.servers;
+      const [mcpRes, skillsRes, builtinRes, enabledMcpRes, enabledSkillsRes] = await Promise.all([
+        api.getRepositoryMcp(),
+        api.getRepositorySkills(),
+        api.getBuiltinSkills(selectedTab),
+        api.getAgentMcpEnabled(selectedTab),
+        api.getAgentSkillsEnabled(selectedTab),
+      ]);
+      mcpServers = mcpRes.servers;
+      skills = skillsRes.skills;
+      builtinSkills = builtinRes.skills;
+      agentMcpEnabled = enabledMcpRes.enabled;
+      agentSkillsEnabled = enabledSkillsRes.enabled;
     } catch {
       mcpServers = {};
-    }
-  }
-
-  async function loadSkills() {
-    if (!selectedAgent) return;
-    try {
-      const res = await api.getSkills(selectedAgent);
-      skills = res.skills;
-    } catch {
       skills = [];
+      builtinSkills = [];
+      agentMcpEnabled = [];
+      agentSkillsEnabled = [];
     }
   }
 
   async function refresh() {
-    await loadMcpServers();
-    await loadSkills();
+    refreshKey++;
+    if (selectedTab === 'repository') {
+      // RepositoryTab handles its own refresh
+    } else {
+      await loadAgentData();
+    }
   }
 
-  function handleAgentChange(agent: string) {
-    selectedAgent = agent;
+  function handleTabChange(tab: string) {
+    selectedTab = tab;
     refresh();
+  }
+
+  async function toggleMcp(name: string) {
+    if (!selectedTab) return;
+    const enabled = agentMcpEnabled.includes(name);
+    await api.enableAgentMcp(selectedTab, name, !enabled);
+    await refresh();
+  }
+
+  async function toggleSkill(name: string) {
+    if (!selectedTab) return;
+    const enabled = agentSkillsEnabled.includes(name);
+    await api.enableAgentSkill(selectedTab, name, !enabled);
+    await refresh();
+  }
+
+  async function toggleBuiltinSkill(name: string) {
+    if (!selectedTab) return;
+    await api.toggleBuiltinSkillPermission(selectedTab, name);
+    await refresh();
+  }
+
+  async function toggleAllMcp(enabled: boolean) {
+    if (!selectedTab) return;
+    await api.toggleAllAgentMcp(selectedTab, enabled);
+    await refresh();
+  }
+
+  async function toggleAllSkills(enabled: boolean) {
+    if (!selectedTab) return;
+    await api.toggleAllAgentSkills(selectedTab, enabled);
+    await refresh();
   }
 
   async function init() {
@@ -69,6 +110,10 @@
   }
 
   onMount(init);
+
+  function isAgentTab(tab: string): boolean {
+    return agents.some(a => a.name === tab);
+  }
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -99,44 +144,143 @@
         </div>
       </div>
     {:else if agents.length > 0}
-      <AgentTabs {agents} {selectedAgent} onSelect={handleAgentChange} />
+      <!-- Tabs: Repository + Agent tabs -->
+      <div class="flex gap-1 border-b border-gray-200">
+        <button
+          class="px-3 py-1.5 text-xs font-medium border-b-2 transition-colors"
+          class:border-carrot-500={selectedTab === 'repository'}
+          class:text-carrot-600={selectedTab === 'repository'}
+          class:border-transparent={selectedTab !== 'repository'}
+          class:text-gray-500={selectedTab !== 'repository'}
+          class:hover:text-gray-700={selectedTab !== 'repository'}
+          onclick={() => handleTabChange('repository')}
+        >
+          Repository
+        </button>
+        {#each agents as agent}
+          <button
+            class="px-3 py-1.5 text-xs font-medium border-b-2 transition-colors"
+            class:border-carrot-500={selectedTab === agent.name}
+            class:text-carrot-600={selectedTab === agent.name}
+            class:border-transparent={selectedTab !== agent.name}
+            class:text-gray-500={selectedTab !== agent.name}
+            class:hover:text-gray-700={selectedTab !== agent.name}
+            class:opacity-50={!agent.available}
+            class:cursor-not-allowed={!agent.available}
+            disabled={!agent.available}
+            onclick={() => handleTabChange(agent.name)}
+          >
+            {agent.name}
+            {#if !agent.available}
+              <span class="text-[10px] text-gray-400 ml-1">(n/a)</span>
+            {/if}
+          </button>
+        {/each}
+      </div>
 
-      {#if selectedAgent}
-        <section class="mt-4">
-          <div class="flex items-center justify-between mb-3">
-            <h2 class="text-sm font-medium text-gray-700">MCP Servers</h2>
-            <button class="btn-primary" onclick={() => (showAddMcp = true)}>
-              + Add
-            </button>
-          </div>
-          {#if Object.keys(mcpServers).length > 0}
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-              {#each Object.entries(mcpServers) as [name, server]}
-                <McpCard {name} {server} agent={selectedAgent} onRefresh={refresh} />
-              {/each}
+      {#if selectedTab === 'repository'}
+        <div class="mt-4">
+          <RepositoryTab onRefresh={refresh} />
+        </div>
+      {:else if isAgentTab(selectedTab)}
+        <div class="mt-4 space-y-6">
+          <!-- MCP Servers -->
+          <section>
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="text-sm font-medium text-gray-700">MCP Servers</h2>
+              <div class="flex gap-1.5">
+                <button class="btn-secondary text-[10px] px-2 py-0.5" onclick={() => toggleAllMcp(true)}>
+                  All ON
+                </button>
+                <button class="btn-secondary text-[10px] px-2 py-0.5" onclick={() => toggleAllMcp(false)}>
+                  All OFF
+                </button>
+              </div>
             </div>
-          {:else}
-            <div class="empty-state">No MCP servers configured</div>
-          {/if}
-        </section>
+            {#if Object.keys(mcpServers).length > 0}
+              <div class="space-y-1.5">
+                {#each Object.entries(mcpServers) as [name, server]}
+                  {@const enabled = agentMcpEnabled.includes(name)}
+                  <div class="card">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="min-w-0 flex-1">
+                        <div class="text-sm font-medium text-gray-800 truncate">{name}</div>
+                        <p class="text-[11px] text-gray-500 truncate mt-0.5">
+                          {server.type}
+                          {#if server.command}
+                            · {server.command.join(' ')}
+                          {:else if server.url}
+                            · {server.url}
+                          {/if}
+                        </p>
+                      </div>
+                      <EnableToggle {enabled} onToggle={() => toggleMcp(name)} />
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="empty-state text-xs">No MCP servers in repository</div>
+            {/if}
+          </section>
 
-        <section class="section">
-          <div class="flex items-center justify-between mb-3">
-            <h2 class="text-sm font-medium text-gray-700">Skills</h2>
-            <button class="btn-primary" onclick={() => (showInstallSkill = true)}>
-              + Install
-            </button>
-          </div>
-          {#if skills.length > 0}
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-              {#each skills as skill}
-                <SkillCard {skill} agent={selectedAgent} onRefresh={refresh} />
-              {/each}
+          <!-- Skills -->
+          <section>
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="text-sm font-medium text-gray-700">Skills</h2>
+              <div class="flex gap-1.5">
+                <button class="btn-secondary text-[10px] px-2 py-0.5" onclick={() => toggleAllSkills(true)}>
+                  All ON
+                </button>
+                <button class="btn-secondary text-[10px] px-2 py-0.5" onclick={() => toggleAllSkills(false)}>
+                  All OFF
+                </button>
+              </div>
             </div>
-          {:else}
-            <div class="empty-state">No skills installed</div>
+            {#if skills.length > 0}
+              <div class="space-y-1.5">
+                {#each skills as skill}
+                  {@const enabled = agentSkillsEnabled.includes(skill.name)}
+                  <div class="card">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="min-w-0 flex-1">
+                        <div class="text-sm font-medium text-gray-800 truncate">{skill.name}</div>
+                        <p class="text-[11px] text-gray-500 truncate mt-0.5">
+                          {skill.source || 'unknown'}
+                        </p>
+                      </div>
+                      <EnableToggle {enabled} onToggle={() => toggleSkill(skill.name)} />
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="empty-state text-xs">No skills in repository</div>
+            {/if}
+          </section>
+
+          <!-- Builtin Skills -->
+          {#if builtinSkills.length > 0}
+            <section>
+              <h2 class="text-sm font-medium text-gray-700 mb-2">Builtin Skills (read-only)</h2>
+              <div class="space-y-1.5">
+                {#each builtinSkills as skill}
+                  <div class="card">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="min-w-0 flex-1">
+                        <div class="text-sm font-medium text-gray-800 truncate">{skill.name}</div>
+                      </div>
+                      <EnableToggle
+                        enabled={skill.allowed}
+                        onToggle={() => toggleBuiltinSkill(skill.name)}
+                      />
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            </section>
           {/if}
-        </section>
+        </div>
       {:else}
         <div class="empty-state mt-8">No agents installed</div>
       {/if}
@@ -144,20 +288,4 @@
       <div class="empty-state mt-8">Loading agents...</div>
     {/if}
   </main>
-
-  {#if showAddMcp}
-    <AddMcpDialog
-      agent={selectedAgent}
-      onClose={() => (showAddMcp = false)}
-      onSaved={() => { showAddMcp = false; refresh(); }}
-    />
-  {/if}
-
-  {#if showInstallSkill}
-    <InstallSkillDialog
-      agent={selectedAgent}
-      onClose={() => (showInstallSkill = false)}
-      onSaved={() => { showInstallSkill = false; refresh(); }}
-    />
-  {/if}
 </div>

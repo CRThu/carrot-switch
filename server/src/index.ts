@@ -1,7 +1,11 @@
 import { join } from "path";
 import { existsSync } from "fs";
 import { createApi } from "./lib/api.js";
+import { migrateIfNeeded } from "./lib/migration.js";
 import { exec } from "child_process";
+
+// Run migration before starting server
+migrateIfNeeded();
 
 const api = createApi();
 

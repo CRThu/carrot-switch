@@ -35,23 +35,44 @@ describe("GET /api/agents", () => {
   });
 });
 
-describe("GET /api/mcp/:agent", () => {
-  it("returns MCP servers for opencode", async () => {
-    const res = await fetch(`http://127.0.0.1:${port}/api/mcp/opencode`);
+describe("GET /api/repository/mcp", () => {
+  it("returns MCP servers from repository", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/repository/mcp`);
     expect(res.ok).toBe(true);
     const data = await res.json();
     expect(data.servers).toBeDefined();
+    expect(typeof data.servers).toBe("object");
+  });
+});
+
+describe("GET /api/repository/skills", () => {
+  it("returns skills from repository", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/repository/skills`);
+    expect(res.ok).toBe(true);
+    const data = await res.json();
+    expect(data.skills).toBeDefined();
+    expect(Array.isArray(data.skills)).toBe(true);
+  });
+});
+
+describe("GET /api/agents/:agent/mcp", () => {
+  it("returns enabled MCP list for agent", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/mcp`);
+    expect(res.ok).toBe(true);
+    const data = await res.json();
+    expect(data.enabled).toBeDefined();
+    expect(Array.isArray(data.enabled)).toBe(true);
   });
 
   it("returns 404 for unknown agent", async () => {
-    const res = await fetch(`http://127.0.0.1:${port}/api/mcp/unknown`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/agents/unknown/mcp`);
     expect(res.status).toBe(404);
   });
 });
 
-describe("GET /api/skills/:agent", () => {
-  it("returns skills for opencode", async () => {
-    const res = await fetch(`http://127.0.0.1:${port}/api/skills/opencode`);
+describe("GET /api/agents/:agent/builtin-skills", () => {
+  it("returns builtin skills", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/builtin-skills`);
     expect(res.ok).toBe(true);
     const data = await res.json();
     expect(data.skills).toBeDefined();
