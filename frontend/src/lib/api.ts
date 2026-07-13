@@ -1,3 +1,13 @@
+import type {
+  Agent,
+  McpServer,
+  AddMcpPayload,
+  Skill,
+  InstallSkillPayload,
+  BuiltinSkill,
+} from "@carrot-switch/shared";
+import { API } from "@carrot-switch/shared";
+
 const BASE = '';
 
 export class ApiError extends Error {
@@ -45,32 +55,39 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
-  getAgents: () => request<{ agents: import('./types').Agent[] }>('GET', '/api/agents'),
+  getAgents: () => request<{ agents: Agent[] }>('GET', API.agents),
 
   getMcpServers: (agent: string) =>
-    request<{ servers: Record<string, import('./types').McpServer> }>('GET', `/api/mcp/${agent}`),
+    request<{ servers: Record<string, McpServer> }>('GET', API.mcp(agent)),
 
-  addMcpServer: (agent: string, data: import('./types').AddMcpPayload) =>
-    request<{ ok: boolean }>('POST', `/api/mcp/${agent}`, data),
+  addMcpServer: (agent: string, data: AddMcpPayload) =>
+    request<{ ok: boolean }>('POST', API.mcp(agent), data),
 
-  updateMcpServer: (agent: string, name: string, data: import('./types').AddMcpPayload) =>
-    request<{ ok: boolean }>('PUT', `/api/mcp/${agent}/${name}`, data),
+  updateMcpServer: (agent: string, name: string, data: AddMcpPayload) =>
+    request<{ ok: boolean }>('PUT', API.mcpServer(agent, name), data),
 
   deleteMcpServer: (agent: string, name: string) =>
-    request<{ ok: boolean }>('DELETE', `/api/mcp/${agent}/${name}`),
+    request<{ ok: boolean }>('DELETE', API.mcpServer(agent, name)),
 
   toggleMcpServer: (agent: string, name: string) =>
-    request<{ enabled: boolean }>('PATCH', `/api/mcp/${agent}/${name}/toggle`),
+    request<{ enabled: boolean }>('PATCH', API.mcpToggle(agent, name)),
 
   getSkills: (agent: string) =>
-    request<{ skills: import('./types').Skill[] }>('GET', `/api/skills/${agent}`),
+    request<{ skills: Skill[] }>('GET', API.skills(agent)),
 
-  installSkill: (agent: string, data: import('./types').InstallSkillPayload) =>
-    request<{ ok: boolean }>('POST', `/api/skills/${agent}/install`, data),
+  installSkill: (agent: string, data: InstallSkillPayload) =>
+    request<{ ok: boolean }>('POST', API.skillInstall(agent), data),
 
   uninstallSkill: (agent: string, name: string) =>
-    request<{ ok: boolean }>('DELETE', `/api/skills/${agent}/${name}`),
+    request<{ ok: boolean }>('DELETE', API.skill(agent, name)),
 
   toggleSkillPermission: (agent: string, name: string) =>
-    request<{ allowed: boolean }>('PATCH', `/api/skills/${agent}/${name}/permission`)
+    request<{ allowed: boolean }>('PATCH', API.skillPermission(agent, name)),
+
+  // Builtin Skills (read-only, permission toggle only)
+  getBuiltinSkills: (agent: string) =>
+    request<{ skills: BuiltinSkill[] }>('GET', API.builtinSkills(agent)),
+
+  toggleBuiltinSkillPermission: (agent: string, name: string) =>
+    request<{ allowed: boolean }>('PATCH', API.builtinSkillPermission(agent, name))
 };

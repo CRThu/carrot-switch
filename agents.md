@@ -10,11 +10,9 @@ Carrot Switch 是一个独立的桌面工具，用于可视化管理 **OpenCode*
 |-------|-----------|
 | Frontend | Svelte 5 + TypeScript 7 + Tailwind CSS 4 |
 | Build | Vite 8 |
-| Backend | FastAPI + uvicorn |
-| Desktop | pywebview (WebView2) |
-| Package | uv + hatchling |
-| Testing | pytest + httpx |
-| Python | 3.12+ |
+| Backend | Hono + Bun.serve() |
+| Package | bun build --compile → exe |
+| Testing | bun test |
 
 ## Quick Start
 
@@ -23,76 +21,86 @@ Carrot Switch 是一个独立的桌面工具，用于可视化管理 **OpenCode*
 cd frontend && bun install && bun run build && cd ..
 
 # Step 2: Run the app
-uv run carrot-switch
+cd server && bun run dev
 ```
 
 ## Project Structure
 
 ```
 carrot-switch/
-├── pyproject.toml               # hatchling build, Python 3.12+
+├── shared/                      # Shared types & API definitions
+│   ├── package.json             # @carrot-switch/shared (workspace)
+│   └── src/
+│       ├── index.ts             # Barrel export
+│       ├── types.ts             # TypeScript interfaces (Agent, McpServer, Skill, etc.)
+│       └── api.ts               # API endpoint paths & response types
 ├── frontend/                    # Vite 8 + Svelte 5 + Tailwind 4
-│   ├── vite.config.ts           # @tailwindcss/vite + svelte plugins
+│   ├── package.json             # depends on @carrot-switch/shared
+│   ├── vite.config.ts           # @tailwindcss/vite + svelte plugins + shared alias
 │   ├── src/
 │   │   ├── main.ts              # Svelte 5 mount() + global crash handler
 │   │   ├── App.svelte           # Main layout: agent tabs + MCP/Skills sections
 │   │   ├── app.css              # Tailwind 4 CSS-first config (@theme, @utility)
 │   │   └── lib/
-│   │       ├── api.ts           # Fetch wrapper (ApiError / NetworkError)
-│   │       ├── types.ts         # TypeScript interfaces
+│   │       ├── api.ts           # Fetch wrapper using shared API paths
+│   │       ├── types.ts         # Re-exports from @carrot-switch/shared
 │   │       └── components/
 │   │           ├── AgentTabs.svelte
 │   │           ├── McpCard.svelte
 │   │           ├── SkillCard.svelte
 │   │           ├── AddMcpDialog.svelte
 │   │           └── InstallSkillDialog.svelte
-├── src/carrot_switch/
-│   ├── __main__.py              # python -m carrot_switch
-│   ├── cli.py                   # carrot-switch command entry
-│   ├── backup.py                # Auto-backup to %APPDATA%/.carrotswitch/
-│   ├── config/
-│   │   ├── __init__.py          # jsonc read/write (strip comments)
-│   │   ├── base.py              # BaseConfig + LazyBaseConfig
-│   │   ├── opencode.py          # OpenCode config (LazyBaseConfig)
-│   │   ├── mimocode.py          # MiMoCode config (LazyBaseConfig)
-│   │   └── claude.py            # Claude Code config (format conversion)
-│   ├── store/
-│   │   ├── __init__.py          # STORE_ROOT, _ensure_dir, _now_iso
-│   │   ├── mcp.py               # MCP local store + sync_to_agent
-│   │   └── skill.py             # Skill metadata store
-│   ├── skill/
-│   │   ├── __init__.py          # Skill directory paths (incl. Claude)
-│   │   └── manager.py           # Skill install/uninstall/permission
-│   └── web/
-│       ├── api.py               # FastAPI REST routes (store-backed)
-│       ├── app.py               # FastAPI + pywebview lifecycle
-│       └── static/              # ← Vite build output (auto-generated)
-├── tests/
-│   ├── conftest.py              # Shared fixtures (tmp_home, tmp_store)
-│   ├── test_config.py           # JSONC utilities
-│   ├── test_opencode.py         # OpenCode config CRUD
-│   ├── test_mimocode.py         # MiMoCode config CRUD
-│   ├── test_backup.py           # Backup management
-│   ├── test_skill_paths.py      # Skill directory paths
-│   ├── test_skill_manager.py    # Skill install/uninstall/permission
-│   ├── test_api.py              # FastAPI endpoints
-│   └── test_integration.py      # Full lifecycle integration tests
+├── server/                      # Bun + TypeScript backend
+│   ├── package.json             # hono, zod, adm-zip, tar + @carrot-switch/shared
+│   ├── tsconfig.json            # ESNext, bundler resolution + paths alias
+│   └── src/
+│       ├── index.ts             # Entry: Bun.serve + browser launch
+│       └── lib/
+│           ├── api.ts           # Hono routes + Zod validation
+│           ├── jsonc.ts         # JSONC read/write (strip comments)
+│           ├── backup.ts        # Config/skill backup
+│           ├── config/
+│           │   ├── base.ts      # BaseConfig class
+│           │   ├── opencode.ts  # OpenCode config
+│           │   ├── mimocode.ts  # MiMoCode config
+│           │   └── claude.ts    # Claude Code config + format conversion
+│           ├── store/
+│           │   ├── mcp.ts       # MCP local store + sync_to_agent
+│           │   └── skill.ts     # Skill metadata store
+│           └── skill/
+│               ├── paths.ts     # Skill directory paths
+│               ├── manager.ts   # Skill install/uninstall/permission
+│               └── builtin.ts   # Builtin skills (read-only scan)
+├── dist/                        # Build output
+│   └── carrot-switch.exe        # Compiled executable
+├── package.json                 # Workspace root
+├── AGENTS.md                    # This file
+├── .gitignore
+└── README.md
 ```
 
 ## Key Design Decisions
 
+### Shared Package (@carrot-switch/shared)
+
+TypeScript interfaces and API path definitions live in `shared/` and are imported by both frontend and server:
+- `shared/src/types.ts` — Agent, McpServer, Skill, BuiltinSkill, etc.
+- `shared/src/api.ts` — API endpoint paths and response types
+
+This ensures type safety: if the API response shape changes, both sides get compile errors.
+
 ### jsonc Handling
 
 Both OpenCode and MiMoCode use JSONC config files (with `//` comments).
-- Read: strip comments → `json.loads()` → dict
-- Write: `json.dumps(indent=2)` → overwrite (comments lost, values preserved)
+- Read: strip comments → `JSON.parse()` → object
+- Write: `JSON.stringify(data, null, 2)` → overwrite (comments lost, values preserved)
 
 ### Agent Config Paths
 
 | Agent | Config File | User Skills Dir |
 |-------|------------|-----------------|
-| OpenCode | `~/.config/opencode/opencode.jsonc` | `~/.codex/skills/` |
-| MiMoCode | `~/.config/mimocode/mimocode.jsonc` | `~/.local/share/mimocode/skills/` |
+| OpenCode | `~/.config/opencode/opencode.jsonc` | `~/.config/opencode/skills/` |
+| MiMoCode | `~/.config/mimocode/mimocode.jsonc` | `~/.config/mimocode/skills/` |
 | Claude Code | `~/.claude.json` | `~/.claude/skills/` |
 
 ### Claude Code Format Differences
@@ -103,7 +111,18 @@ Claude Code uses a different MCP format than OpenCode/MiMoCode:
 - No `enabled` field (all servers active)
 - `type: "http"` for remote (not `"remote"`)
 
-The `claude.py` module handles format conversion between internal and Claude formats.
+The `claude.ts` module handles format conversion between internal and Claude formats.
+
+### Builtin Skills
+
+Builtin skills are shipped with each agent and cannot be installed/uninstalled.
+They are read-only and can only be toggled via permission.
+
+| Agent | Builtin Skills Path |
+|-------|---------------------|
+| OpenCode | `~/.codex/skills/.system/` |
+| MiMoCode | `~/.local/share/mimocode/builtin_skills/{version}/skills/` |
+| Claude Code | `~/.claude/skills/.system/` |
 
 ### Local Store Architecture
 
@@ -124,12 +143,12 @@ Carrot Switch maintains its own local JSON store at `%APPDATA%/.carrotswitch/`:
 
 ```
 carrot-switch start
-  ├─ 1. socket.bind(0) → random free port
-  ├─ 2. FastAPI starts on background thread (uvicorn)
-  ├─ 3. pywebview opens window → load http://localhost:{port}
+  ├─ 1. Bun.serve({ port: 0 }) → random free port
+  ├─ 2. HTTP server starts (Hono)
+  ├─ 3. Browser opens → http://localhost:{port}
   ├─ 4. UI → fetch API → read/write local store + sync to agent config
-  ├─ 5. User closes window
-  └─ 6. pywebview exits → uvicorn thread stops → process exits
+  ├─ 5. User closes browser tab
+  └─ 6. Process exits
 ```
 
 ### Backup
@@ -151,35 +170,38 @@ Before every config/skill modification, backup to:
 | PUT | `/api/mcp/{agent}/{name}` | Update MCP server |
 | DELETE | `/api/mcp/{agent}/{name}` | Delete MCP server |
 | PATCH | `/api/mcp/{agent}/{name}/toggle` | Toggle enable/disable (local only) |
-| GET | `/api/skills/{agent}` | List skills + metadata |
+| GET | `/api/skills/{agent}` | List user-installed skills |
 | POST | `/api/skills/{agent}/install` | Install skill (github/local/zip/url) |
 | DELETE | `/api/skills/{agent}/{name}` | Uninstall skill |
 | PATCH | `/api/skills/{agent}/{name}/permission` | Toggle allow/deny |
+| GET | `/api/builtin-skills/{agent}` | List builtin skills (read-only) |
+| PATCH | `/api/builtin-skills/{agent}/{name}/permission` | Toggle builtin skill allow/deny |
 
 ## Build & Package
 
 ```powershell
-# Step 1: Build frontend (outputs to src/carrot_switch/web/static/)
+# Step 1: Build frontend
 cd frontend && bun run build && cd ..
 
-# Step 2: Run backend (serves static + API)
-uv run carrot-switch
+# Step 2: Run in dev mode
+cd server && bun run dev
+
+# Step 3: Compile to exe (produces dist/carrot-switch.exe ~94MB)
+cd server && bun run build
 ```
 
 ## Testing
 
 ```powershell
-# Run all tests
-uv run pytest tests/ -v
-
-# Run a specific test file
-uv run pytest tests/test_config.py -v
-
-# Run integration tests only
-uv run pytest tests/test_integration.py -v
+cd server && bun test
 ```
 
-Tests use `tmp_home` and `tmp_store` fixtures to isolate filesystem operations.
+Tests in `server/src/__tests__/` cover:
+- JSONC utilities (strip comments, read/write)
+- Config modules (BaseConfig CRUD, Claude format conversion)
+- API endpoints (agents, MCP CRUD, skills)
+- Backup operations
+- Skill paths
 
 ### Dev Proxy
 

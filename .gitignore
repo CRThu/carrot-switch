@@ -1,25 +1,7 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-dist/
-build/
-*.egg
-.venv/
-
-# uv
-.python-version
-
-# Node
+# Bun / Node
 node_modules/
 
-# IDE
-.vscode/
-.idea/
+# Build output
+dist/
 
-# OS
-Thumbs.db
-.DS_Store
-
-# App data
-.carrotswitch/
+**/*.log

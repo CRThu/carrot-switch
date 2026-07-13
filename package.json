@@ -1,0 +1,9 @@
+{
+  "name": "carrot-switch",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "server",
+    "frontend"
+  ]
+}
