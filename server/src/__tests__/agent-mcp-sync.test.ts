@@ -4,6 +4,7 @@ import { join } from "path";
 
 import * as repoMcp from "../lib/repository/mcp.js";
 import * as agentMcp from "../lib/agent/mcp.js";
+import { AGENTS_ROOT } from "../lib/base.js";
 
 const TEST_MCP_SYNC = "sync-test-server";
 const TEST_MCP_SYNC2 = "sync-test-server-2";
@@ -122,11 +123,8 @@ describe("Agent MCP - syncAll and edge cases", () => {
   describe("readEnableList edge cases", () => {
     it("handles corrupted JSON in enable list file", () => {
       // Write corrupted JSON to the enable list file
-      const enableListPath = join(
-        process.env.APPDATA || "",
-        ".carrotswitch", "agents", TEST_AGENT, "mcp-enabled.json"
-      );
-      mkdirSync(join(process.env.APPDATA || "", ".carrotswitch", "agents", TEST_AGENT), { recursive: true });
+      const enableListPath = join(AGENTS_ROOT, TEST_AGENT, "mcp-enabled.json");
+      mkdirSync(join(AGENTS_ROOT, TEST_AGENT), { recursive: true });
       writeFileSync(enableListPath, "not valid json {{{", "utf-8");
 
       // getEnabled should return empty array
