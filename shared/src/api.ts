@@ -18,6 +18,7 @@ export const API = {
   // ── Agent enable/disable ──────────────────────────────────────────────────
   agentMcp: (agent: string) => `/api/agents/${agent}/mcp`,
   agentMcpEnable: (agent: string, name: string) => `/api/agents/${agent}/mcp/${name}/enable`,
+  agentMcpToggle: (agent: string, name: string) => `/api/agents/${agent}/mcp/${name}/toggle`,
   agentMcpToggleAll: (agent: string) => `/api/agents/${agent}/mcp/toggle-all`,
   agentSkills: (agent: string) => `/api/agents/${agent}/skills`,
   agentSkillEnable: (agent: string, name: string) => `/api/agents/${agent}/skills/${name}/enable`,

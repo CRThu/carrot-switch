@@ -2,6 +2,7 @@
   import { api } from '../api';
   import type { RepositoryMcp, SkillMeta } from '../types';
   import AddMcpDialog from './AddMcpDialog.svelte';
+  import InstallSkillDialog from './InstallSkillDialog.svelte';
 
   let { onRefresh: _onRefresh }: { onRefresh: () => void } = $props();
 
@@ -9,6 +10,7 @@
   let skills: SkillMeta[] = $state([]);
   let loading = $state(true);
   let showAddMcp = $state(false);
+  let showInstallSkill = $state(false);
   let editingMcp: string | null = $state(null);
   let editForm = $state({ type: 'local', command: '', url: '', environment: '' });
 
@@ -101,9 +103,14 @@
 <div class="space-y-6">
   <div class="flex items-center justify-between">
     <h2 class="text-sm font-medium text-gray-700">Repository</h2>
-    <button class="btn-primary text-xs" onclick={() => (showAddMcp = true)}>
-      + Add MCP
-    </button>
+    <div class="flex gap-1.5">
+      <button class="btn-primary text-xs" onclick={() => (showAddMcp = true)}>
+        + Add MCP
+      </button>
+      <button class="btn-primary text-xs" onclick={() => (showInstallSkill = true)}>
+        + Install Skill
+      </button>
+    </div>
   </div>
 
   {#if loading}
@@ -229,5 +236,12 @@
     agent=""
     onClose={() => (showAddMcp = false)}
     onSaved={() => { showAddMcp = false; loadData(); _onRefresh(); }}
+  />
+{/if}
+
+{#if showInstallSkill}
+  <InstallSkillDialog
+    onClose={() => (showInstallSkill = false)}
+    onSaved={() => { showInstallSkill = false; loadData(); _onRefresh(); }}
   />
 {/if}

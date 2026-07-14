@@ -190,17 +190,13 @@ export function createApi() {
     const body = await c.req.json();
     const parsed = InstallSkillSchema.parse(body);
 
-    const name = parsed.source.split(/[\\/]/).pop()?.replace(".git", "") || "unknown";
+    const { existsSync, mkdirSync, cpSync, mkdtempSync, rmSync } = await import("fs");
+    const { tmpdir } = await import("os");
 
-    if (repoSkill.exists(name)) {
-      throw new HttpException(400, `Skill '${name}' already exists in repository`);
-    }
-
-    // Install to repository skills dir
-    const repoSkillsDir = repoSkill.getSkillPath(name);
-    const { existsSync, mkdirSync } = await import("fs");
+    let name: string;
 
     if (parsed.sourceType === "local") {
+      name = parsed.source.split(/[\\/]/).pop() || "unknown";
       const sourcePath = parsed.source;
       if (!existsSync(sourcePath)) {
         throw new HttpException(400, `Source path does not exist: ${sourcePath}`);
@@ -208,14 +204,24 @@ export function createApi() {
       if (!existsSync(join(sourcePath, "SKILL.md"))) {
         throw new HttpException(400, `Source directory does not contain SKILL.md: ${sourcePath}`);
       }
+
+      if (repoSkill.exists(name)) {
+        throw new HttpException(400, `Skill '${name}' already exists in repository`);
+      }
+      const repoSkillsDir = repoSkill.getSkillPath(name);
       repoSkill.ensureSkillDir();
-      const { cpSync } = await import("fs");
       cpSync(sourcePath, repoSkillsDir, { recursive: true });
     } else if (parsed.sourceType === "github") {
+      name = parsed.source.split(/[\\/]/).pop()?.replace(".git", "") || "unknown";
       let repoUrl = parsed.source;
       if (!repoUrl.startsWith("http")) {
         repoUrl = `https://github.com/${repoUrl}.git`;
       }
+
+      if (repoSkill.exists(name)) {
+        throw new HttpException(400, `Skill '${name}' already exists in repository`);
+      }
+      const repoSkillsDir = repoSkill.getSkillPath(name);
       repoSkill.ensureSkillDir();
       mkdirSync(repoSkillsDir, { recursive: true });
       const proc = Bun.spawn(["git", "clone", repoUrl, repoSkillsDir]);
@@ -224,8 +230,6 @@ export function createApi() {
         throw new HttpException(500, `git clone failed with exit code ${proc.exitCode}`);
       }
     } else if (parsed.sourceType === "zip") {
-      const { mkdtempSync, rmSync } = await import("fs");
-      const { tmpdir } = await import("os");
       const { default: AdmZip } = await import("adm-zip");
 
       const tmpDir = mkdtempSync(join(tmpdir(), "carrot-"));
@@ -239,28 +243,31 @@ export function createApi() {
           await Bun.write(zipPath, buffer);
         } else {
           zipPath = parsed.source;
+          if (!existsSync(zipPath)) {
+            throw new HttpException(400, `ZIP file not found: ${zipPath}`);
+          }
         }
 
         const extractDir = join(tmpDir, "extracted");
         const zip = new AdmZip(zipPath);
         zip.extractAllTo(extractDir, true);
 
-        // Find skill dir with SKILL.md
         const skillDir = findSkillMd(extractDir);
         if (!skillDir) {
           throw new HttpException(400, "ZIP does not contain a directory with SKILL.md");
         }
 
+        name = skillDir.split(/[\\/]/).pop() || "unknown";
+        if (repoSkill.exists(name)) {
+          throw new HttpException(400, `Skill '${name}' already exists in repository`);
+        }
+        const repoSkillsDir = repoSkill.getSkillPath(name);
         repoSkill.ensureSkillDir();
-        const { cpSync } = await import("fs");
         cpSync(skillDir, repoSkillsDir, { recursive: true });
       } finally {
         rmSync(tmpDir, { recursive: true, force: true });
       }
     } else if (parsed.sourceType === "url") {
-      const { mkdtempSync, mkdirSync, rmSync } = await import("fs");
-      const { tmpdir } = await import("os");
-
       let ext = ".zip";
       if (parsed.source.includes(".tar.gz") || parsed.source.includes(".tgz")) ext = ".tar.gz";
       else if (parsed.source.includes(".tar")) ext = ".tar";
@@ -290,12 +297,18 @@ export function createApi() {
           throw new HttpException(400, "Downloaded archive does not contain a directory with SKILL.md");
         }
 
+        name = skillDir.split(/[\\/]/).pop() || "unknown";
+        if (repoSkill.exists(name)) {
+          throw new HttpException(400, `Skill '${name}' already exists in repository`);
+        }
+        const repoSkillsDir = repoSkill.getSkillPath(name);
         repoSkill.ensureSkillDir();
-        const { cpSync } = await import("fs");
         cpSync(skillDir, repoSkillsDir, { recursive: true });
       } finally {
         rmSync(tmpDir, { recursive: true, force: true });
       }
+    } else {
+      throw new HttpException(400, `Unknown source type: ${parsed.sourceType}`);
     }
 
     repoSkill.add(name, parsed.source, parsed.sourceType);
@@ -419,6 +432,14 @@ export function createApi() {
     }
 
     return c.json({ ok: true });
+  });
+
+  app.post("/api/agents/:agent/mcp/:name/toggle", async (c) => {
+    const agent = c.req.param("agent");
+    const name = c.req.param("name");
+    checkAvailable(agent);
+    const enabled = agentMcp.toggle(agent, name);
+    return c.json({ enabled });
   });
 
   app.post("/api/agents/:agent/mcp/toggle-all", async (c) => {

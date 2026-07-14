@@ -1,8 +1,7 @@
 <script lang="ts">
   import { api } from '../api';
 
-  let { agent, onClose, onSaved }: {
-    agent: string;
+  let { onClose, onSaved }: {
     onClose: () => void;
     onSaved: () => void;
   } = $props();
@@ -34,7 +33,7 @@
     saving = true;
     error = '';
     try {
-      await api.installSkill(agent, { source: source.trim(), source_type: sourceType });
+      await api.installRepositorySkill({ source: source.trim(), sourceType });
       onSaved();
     } catch (e: any) {
       error = e.message || 'Failed to install skill';

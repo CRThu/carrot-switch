@@ -99,6 +99,12 @@ export const api = {
   enableAgentMcp: (agent: string, name: string, enabled: boolean) =>
     request<{ ok: boolean }>('POST', API.agentMcpEnable(agent, name), { enabled }),
 
+  toggleAgentMcp: (agent: string, name: string) =>
+    request<{ enabled: boolean }>('POST', API.agentMcpToggle(agent, name)),
+
+  deleteAgentMcp: (agent: string, name: string) =>
+    request<{ ok: boolean }>('POST', API.agentMcpEnable(agent, name), { enabled: false }),
+
   toggleAllAgentMcp: (agent: string, enabled: boolean) =>
     request<{ ok: boolean }>('POST', API.agentMcpToggleAll(agent), { enabled }),
 
@@ -109,6 +115,9 @@ export const api = {
   enableAgentSkill: (agent: string, name: string, enabled: boolean) =>
     request<{ ok: boolean }>('POST', API.agentSkillEnable(agent, name), { enabled }),
 
+  uninstallAgentSkill: (agent: string, name: string) =>
+    request<{ ok: boolean }>('POST', API.agentSkillEnable(agent, name), { enabled: false }),
+
   toggleAllAgentSkills: (agent: string, enabled: boolean) =>
     request<{ ok: boolean }>('POST', API.agentSkillToggleAll(agent), { enabled }),
 
@@ -117,5 +126,9 @@ export const api = {
     request<{ skills: BuiltinSkill[] }>('GET', API.builtinSkills(agent)),
 
   toggleBuiltinSkillPermission: (agent: string, name: string) =>
+    request<{ allowed: boolean }>('POST', API.builtinSkillToggle(agent, name), { enabled: true }),
+
+  // ── Agent Skill permission toggle ───────────────────────────────────────────
+  toggleSkillPermission: (agent: string, name: string) =>
     request<{ allowed: boolean }>('POST', API.builtinSkillToggle(agent, name), { enabled: true }),
 };
