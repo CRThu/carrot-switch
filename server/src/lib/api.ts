@@ -135,9 +135,9 @@ export function createApi() {
 
     const patch: Partial<RepositoryMcp> = {};
     if (parsed.type) patch.type = parsed.type;
-    if (command !== undefined) patch.command = command;
-    if (parsed.url !== undefined) patch.url = parsed.url;
-    if (parsed.environment !== undefined) patch.environment = parsed.environment;
+    if (command != null) patch.command = command;
+    if (parsed.url != null) patch.url = parsed.url;
+    if (parsed.environment != null) patch.environment = parsed.environment;
 
     const updated = repoMcp.update(name, patch);
 

@@ -24,7 +24,7 @@ export function getUserSkillsDir(agent: string): string {
   return getUserSkills(agent);
 }
 
-export function getBuiltinSkillsDir(agent: string): string {
+export function getBuiltinSkillsDir(agent: string): string | null {
   return getBuiltinSkills(agent);
 }
 
