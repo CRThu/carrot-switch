@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { existsSync, statSync, readdirSync, readFileSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
 import { homedir } from "os";
+import versionData from "../../../version.json" with { type: "json" };
 import * as oc from "./config/opencode.js";
 import * as mc from "./config/mimocode.js";
 import * as cl from "./config/claude.js";
@@ -81,13 +82,7 @@ export function createApi() {
   // ── Version ──────────────────────────────────────────────────────────────────
 
   app.get("/api/version", (c) => {
-    try {
-      const versionPath = join(import.meta.dirname, "../../../version.json");
-      const data = JSON.parse(readFileSync(versionPath, "utf-8"));
-      return c.json({ version: data.version, name: data.name });
-    } catch {
-      return c.json({ version: "0.0.0", name: "Carrot Switch" });
-    }
+    return c.json({ version: versionData.version, name: versionData.name });
   });
 
   // ── Agents ──────────────────────────────────────────────────────────────────
