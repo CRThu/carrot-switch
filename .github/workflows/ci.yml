@@ -21,7 +21,7 @@ jobs:
         run: cd frontend && bun run build
 
       - name: Run tests
-        run: cd server && bun test
+        run: cd server && bun test --preload ./src/__tests__/setup.ts
 
       - name: Type check
         run: cd server && bunx tsc --noEmit

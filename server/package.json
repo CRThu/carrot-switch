@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun run src/index.ts",
     "build": "bun build --compile --outfile ../dist/carrot-switch.exe src/index.ts",
-    "test": "bun test"
+    "test": "bun test --preload ./src/__tests__/setup.ts"
   },
   "dependencies": {
     "@carrot-switch/shared": "workspace:*",
