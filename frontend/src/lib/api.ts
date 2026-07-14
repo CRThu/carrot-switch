@@ -8,6 +8,7 @@ import type {
   RepositoryMcp,
   SkillMeta,
   AgentEnableList,
+  VersionResponse,
 } from "@carrot-switch/shared";
 import { API } from "@carrot-switch/shared";
 
@@ -58,6 +59,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
+  // ── Version ─────────────────────────────────────────────────────────────────
+  getVersion: () => request<VersionResponse>('GET', API.version),
+
   // ── Agents ──────────────────────────────────────────────────────────────────
   getAgents: () => request<{ agents: Agent[] }>('GET', API.agents),
 

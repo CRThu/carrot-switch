@@ -5,6 +5,7 @@ import { join } from "path";
 import * as repoSkill from "../lib/repository/skill.js";
 import * as agentSkill from "../lib/agent/skill.js";
 import { getUserSkillsDir } from "../lib/skill/paths.js";
+import { AGENTS_ROOT } from "../lib/base.js";
 
 const TEST_SKILL_SYNC = "sync-test-skill";
 const TEST_SKILL_SYNC2 = "sync-test-skill-2";
@@ -132,11 +133,8 @@ describe("Agent Skill - syncAll and edge cases", () => {
 
   describe("readEnableList edge cases", () => {
     it("handles corrupted JSON in enable list file", () => {
-      const enableListPath = join(
-        process.env.APPDATA || "",
-        ".carrotswitch", "agents", TEST_AGENT, "skill-enabled.json"
-      );
-      mkdirSync(join(process.env.APPDATA || "", ".carrotswitch", "agents", TEST_AGENT), { recursive: true });
+      const enableListPath = join(AGENTS_ROOT, TEST_AGENT, "skill-enabled.json");
+      mkdirSync(join(AGENTS_ROOT, TEST_AGENT), { recursive: true });
       writeFileSync(enableListPath, "not valid json {{{", "utf-8");
 
       const enabled = agentSkill.getEnabled(TEST_AGENT);

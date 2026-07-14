@@ -81,6 +81,7 @@ carrot-switch/
 │               └── builtin.ts   # Builtin skills (read-only scan + permission toggle)
 ├── dist/                        # Build output
 │   └── carrot-switch.exe        # Compiled executable
+├── version.json                 # Version info (single source of truth)
 ├── package.json                 # Workspace root
 ├── AGENTS.md                    # This file
 ├── .gitignore
@@ -190,6 +191,12 @@ Before every config/skill modification, backup to:
 ```
 
 ## API Endpoints
+
+### Version
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/version` | Get current version number |
 
 ### Agents
 

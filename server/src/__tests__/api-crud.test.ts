@@ -1,17 +1,29 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { createApi } from "../lib/api.js";
+import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
 
 const api = createApi();
 let server: any;
 let port: number;
+let tmpSkillDir: string;
 
 beforeAll(async () => {
   server = Bun.serve({ port: 0, fetch: api.fetch });
   port = server.port;
+
+  // Create temp skill directory with SKILL.md for local install tests
+  tmpSkillDir = join(tmpdir(), `carrot-test-skill-${Date.now()}`);
+  mkdirSync(tmpSkillDir, { recursive: true });
+  writeFileSync(join(tmpSkillDir, "SKILL.md"), "# Test Skill\n\nTest skill for API tests.");
 });
 
 afterAll(() => {
   server.stop();
+  if (existsSync(tmpSkillDir)) {
+    rmSync(tmpSkillDir, { recursive: true, force: true });
+  }
 });
 
 describe("API Endpoints", () => {
@@ -235,6 +247,64 @@ describe("API Endpoints", () => {
       expect(data.skills).toBeDefined();
       expect(Array.isArray(data.skills)).toBe(true);
     });
+
+    it("installs skill from local directory", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/skills/install`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: tmpSkillDir,
+          sourceType: "local",
+        }),
+      });
+      expect(res.ok).toBe(true);
+      const data = await res.json();
+      expect(data.ok).toBe(true);
+    });
+
+    it("returns 400 for duplicate skill install", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/skills/install`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: tmpSkillDir,
+          sourceType: "local",
+        }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("installed skill appears in list", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/skills`);
+      const data = await res.json();
+      const names = data.skills.map((s: any) => s.name);
+      // Name is derived from last path segment of source
+      const expectedName = tmpSkillDir.split(/[\\/]/).pop()!;
+      expect(names).toContain(expectedName);
+    });
+
+    it("deletes installed skill from repository", async () => {
+      const skillName = tmpSkillDir.split(/[\\/]/).pop()!;
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/skills/${skillName}`, {
+        method: "DELETE",
+      });
+      expect(res.ok).toBe(true);
+    });
+
+    it("returns 404 for unknown skill delete", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/skills/nonexistent-skill`, {
+        method: "DELETE",
+      });
+      expect(res.status).toBe(404);
+    });
+
+    it("deleted skill no longer appears in list", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/repository/skills`);
+      const data = await res.json();
+      const names = data.skills.map((s: any) => s.name);
+      const deletedName = tmpSkillDir.split(/[\\/]/).pop()!;
+      expect(names).not.toContain(deletedName);
+    });
   });
 
   describe("Agent Skills enable/disable", () => {
@@ -311,6 +381,77 @@ describe("API Endpoints", () => {
     it("returns 404 for unknown agent on builtin-skills", async () => {
       const res = await fetch(`http://127.0.0.1:${port}/api/agents/unknown/builtin-skills`);
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe("Delete cascade", () => {
+    it("deleting repository skill removes it from agent enable list", async () => {
+      // Name is derived from last path segment of source
+      const skillName = tmpSkillDir.split(/[\\/]/).pop()!;
+
+      // Install skill to repository
+      await fetch(`http://127.0.0.1:${port}/api/repository/skills/install`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: tmpSkillDir, sourceType: "local" }),
+      });
+
+      // Enable for agent
+      await fetch(`http://127.0.0.1:${port}/api/agents/opencode/skills/${skillName}/enable`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: true }),
+      });
+
+      // Verify enabled
+      let res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/skills`);
+      let data = await res.json();
+      expect(data.enabled).toContain(skillName);
+
+      // Delete from repository
+      res = await fetch(`http://127.0.0.1:${port}/api/repository/skills/${skillName}`, {
+        method: "DELETE",
+      });
+      expect(res.ok).toBe(true);
+
+      // Verify removed from agent enable list
+      res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/skills`);
+      data = await res.json();
+      expect(data.enabled).not.toContain(skillName);
+    });
+
+    it("deleting repository MCP removes it from agent enable list", async () => {
+      const name = "cascade-delete-test";
+
+      // Add to repository
+      await fetch(`http://127.0.0.1:${port}/api/repository/mcp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, type: "local", command: ["node"] }),
+      });
+
+      // Enable for agent
+      await fetch(`http://127.0.0.1:${port}/api/agents/opencode/mcp/${name}/enable`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: true }),
+      });
+
+      // Verify enabled
+      let res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/mcp`);
+      let data = await res.json();
+      expect(data.enabled).toContain(name);
+
+      // Delete from repository
+      res = await fetch(`http://127.0.0.1:${port}/api/repository/mcp/${name}`, {
+        method: "DELETE",
+      });
+      expect(res.ok).toBe(true);
+
+      // Verify removed from agent enable list
+      res = await fetch(`http://127.0.0.1:${port}/api/agents/opencode/mcp`);
+      data = await res.json();
+      expect(data.enabled).not.toContain(name);
     });
   });
 

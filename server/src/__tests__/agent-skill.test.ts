@@ -101,4 +101,21 @@ describe("Agent Skill enable/disable", () => {
     const enabled = agentSkill.getEnabled(TEST_AGENT);
     expect(enabled.length).toBe(0);
   });
+
+  it("disable works even when agent skills dir may not exist", () => {
+    agentSkill.enable(TEST_AGENT, TEST_SKILL_NAME);
+    expect(agentSkill.isEnabled(TEST_AGENT, TEST_SKILL_NAME)).toBe(true);
+
+    agentSkill.disable(TEST_AGENT, TEST_SKILL_NAME);
+    expect(agentSkill.isEnabled(TEST_AGENT, TEST_SKILL_NAME)).toBe(false);
+  });
+
+  it("disable removes skill directory from agent", () => {
+    agentSkill.enable(TEST_AGENT, TEST_SKILL_NAME);
+    const agentSkillDir = join(getUserSkillsDir(TEST_AGENT), TEST_SKILL_NAME);
+    expect(existsSync(agentSkillDir)).toBe(true);
+
+    agentSkill.disable(TEST_AGENT, TEST_SKILL_NAME);
+    expect(existsSync(agentSkillDir)).toBe(false);
+  });
 });

@@ -6,6 +6,8 @@
   import EnableToggle from './lib/components/EnableToggle.svelte';
   import RepositoryTab from './lib/components/RepositoryTab.svelte';
 
+  let currentVersion = $state('...');
+  let hasUpdate = $state(false);
   let agents: Agent[] = $state([]);
   let selectedTab: string = $state('repository');
   let mcpServers: Record<string, McpServer> = $state({});
@@ -15,6 +17,31 @@
   let agentSkillsEnabled: string[] = $state([]);
   let error: string | null = $state(null);
   let refreshKey = $state(0);
+
+  const GITHUB_REPO = 'https://github.com/CRThu/carrot-switch';
+  const GITHUB_RAW_VERSION = 'https://raw.githubusercontent.com/CRThu/carrot-switch/main/version.json';
+
+  async function loadVersion() {
+    try {
+      const data = await api.getVersion();
+      currentVersion = data.version || 'dev';
+    } catch {
+      currentVersion = 'dev';
+    }
+  }
+
+  async function checkUpdate() {
+    try {
+      const res = await fetch(GITHUB_RAW_VERSION + '?t=' + Date.now());
+      if (!res.ok) return;
+      const remote = await res.json();
+      if (remote.version && remote.version !== currentVersion) {
+        hasUpdate = true;
+      }
+    } catch {
+      // 网络不可用，静默忽略
+    }
+  }
 
   async function loadAgents() {
     const res = await api.getAgents();
@@ -97,6 +124,8 @@
 
   async function init() {
     try {
+      await loadVersion();
+      checkUpdate();
       await loadAgents();
       await refresh();
       error = null;
@@ -123,6 +152,16 @@
         <span class="text-white text-xs font-bold">C</span>
       </div>
       <h1 class="text-base font-semibold text-gray-800">Carrot Switch</h1>
+      <span class="text-[10px] text-gray-400">v{currentVersion}</span>
+      {#if hasUpdate}
+        <button
+          class="text-[10px] text-carrot-500 hover:text-carrot-600 font-medium cursor-pointer"
+          onclick={() => window.open(GITHUB_REPO, '_blank')}
+          title="点击前往下载新版本"
+        >
+          ↑ 有新版本
+        </button>
+      {/if}
     </div>
   </header>
 
@@ -198,7 +237,7 @@
               </div>
             </div>
             {#if Object.keys(mcpServers).length > 0}
-              <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {#each Object.entries(mcpServers) as [name, server]}
                   {@const enabled = agentMcpEnabled.includes(name)}
                   <div class="card">
@@ -233,7 +272,7 @@
               </div>
             </div>
             {#if skills.length > 0}
-              <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {#each skills as skill}
                   {@const enabled = agentSkillsEnabled.includes(skill.name)}
                   <div class="card">
@@ -258,7 +297,7 @@
           {#if builtinSkills.length > 0}
             <section>
               <h2 class="text-sm font-medium text-gray-700 mb-2">Builtin Skills (read-only)</h2>
-              <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {#each builtinSkills as skill}
                   <div class="card">
                     <div class="flex items-center justify-between gap-1">

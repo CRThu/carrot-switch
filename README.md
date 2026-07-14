@@ -9,6 +9,7 @@
 - **Builtin Skills 权限管理**：控制 Agent 内置 Skills 的允许/拒绝
 - **配置备份**：修改前自动备份
 - **旧数据迁移**：从旧版本无缝升级
+- **自动检查更新**：启动时自动检查 GitHub 上的新版本，有更新时提示下载
 
 ## 快速开始
 
@@ -73,6 +74,7 @@ carrot-switch/
 │           ├── backup.ts    # 配置/Skill 备份
 │           ├── logger.ts    # 日志文件管理
 │           └── migration.ts # 旧版存储迁移
+├── version.json             # 版本号
 └── dist/
     └── carrot-switch.exe
 ```
@@ -108,6 +110,7 @@ carrot-switch/
 
 | 方法 | 路径 | 描述 |
 |------|------|------|
+| GET | `/api/version` | 获取当前版本号 |
 | GET | `/api/agents` | 列出所有 Agent 及可用性 |
 | GET | `/api/repository/mcp` | 列出仓库中所有 MCP |
 | POST | `/api/repository/mcp` | 添加 MCP 到仓库 |

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { existsSync, statSync, readdirSync } from "fs";
+import { existsSync, statSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import * as oc from "./config/opencode.js";
@@ -76,6 +76,18 @@ export function createApi() {
     }
     console.error(err);
     return c.json({ detail: "Internal server error" }, 500);
+  });
+
+  // ── Version ──────────────────────────────────────────────────────────────────
+
+  app.get("/api/version", (c) => {
+    try {
+      const versionPath = join(import.meta.dirname, "../../../version.json");
+      const data = JSON.parse(readFileSync(versionPath, "utf-8"));
+      return c.json({ version: data.version, name: data.name });
+    } catch {
+      return c.json({ version: "0.0.0", name: "Carrot Switch" });
+    }
   });
 
   // ── Agents ──────────────────────────────────────────────────────────────────
@@ -345,6 +357,46 @@ export function createApi() {
           // ignore sync errors
         }
       }
+    }
+
+    // Import skills from agent's user skills directory
+    const { getUserSkillsDir } = await import("./skill/paths.js");
+    const { existsSync, readdirSync, statSync, mkdirSync, cpSync } = await import("fs");
+    const { join } = await import("path");
+
+    try {
+      const userSkillsDir = getUserSkillsDir(agent);
+      if (existsSync(userSkillsDir)) {
+        for (const entry of readdirSync(userSkillsDir)) {
+          const entryPath = join(userSkillsDir, entry);
+          try {
+            if (!statSync(entryPath).isDirectory()) continue;
+            if (!existsSync(join(entryPath, "SKILL.md"))) continue;
+
+            const name = entry;
+
+            if (!repoSkill.exists(name)) {
+              const repoSkillDir = repoSkill.getSkillPath(name);
+              repoSkill.ensureSkillDir();
+              mkdirSync(repoSkillDir, { recursive: true });
+              cpSync(entryPath, repoSkillDir, { recursive: true });
+              repoSkill.add(name, `imported from ${agent}`, "local");
+            }
+
+            if (!agentSkill.isEnabled(agent, name)) {
+              try {
+                agentSkill.enable(agent, name);
+              } catch {
+                // ignore sync errors
+              }
+            }
+          } catch {
+            // skip unreadable entries
+          }
+        }
+      }
+    } catch {
+      // skills import may fail if dir doesn't exist
     }
 
     return c.json({ ok: true });

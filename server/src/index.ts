@@ -1,5 +1,5 @@
 import { createApi } from "./lib/api.js";
-import { migrateIfNeeded } from "./lib/migration.js";
+import { migrateIfNeeded, importAllAgents } from "./lib/migration.js";
 import { exec } from "child_process";
 import { serve } from "bun";
 import index from "../../frontend/dist/index.html";
@@ -19,6 +19,7 @@ const portArg = getArg(["-p", "--port"]);
 const port = portArg ? Number(portArg) : 0;
 
 migrateIfNeeded();
+importAllAgents();
 
 const api = createApi();
 

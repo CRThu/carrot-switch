@@ -84,3 +84,8 @@ export interface UpdateRepositoryMcpPayload {
 export interface EnablePayload {
   enabled: boolean;
 }
+
+export interface VersionResponse {
+  version: string;
+  name: string;
+}

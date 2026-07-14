@@ -1,7 +1,10 @@
-import type { Agent, McpServer, AddMcpPayload, Skill, InstallSkillPayload, BuiltinSkill, RepositoryMcp, SkillMeta, AgentEnableList } from './types.js';
+import type { Agent, McpServer, AddMcpPayload, Skill, InstallSkillPayload, BuiltinSkill, RepositoryMcp, SkillMeta, AgentEnableList, VersionResponse } from './types.js';
 
 // API Paths
 export const API = {
+  // Version
+  version: '/api/version',
+
   // Agents
   agents: '/api/agents',
 
@@ -66,3 +69,6 @@ export interface RepositorySkillsResponse {
 export interface AgentEnableListResponse {
   enabled: AgentEnableList;
 }
+
+// Version API
+export type { VersionResponse };

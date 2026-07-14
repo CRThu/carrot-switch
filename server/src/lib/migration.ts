@@ -1,5 +1,5 @@
 import { join } from "path";
-import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync, renameSync } from "fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync, renameSync, statSync, cpSync } from "fs";
 import * as repository from "./repository/mcp.js";
 import * as repoSkill from "./repository/skill.js";
 import * as agentMcp from "./agent/mcp.js";
@@ -7,6 +7,10 @@ import * as agentSkill from "./agent/skill.js";
 import type { RepositoryMcp, McpType } from "@carrot-switch/shared";
 import { info, warn } from "./logger.js";
 import { CARROT_ROOT } from "./base.js";
+import { getUserSkillsDir } from "./skill/paths.js";
+import * as oc from "./config/opencode.js";
+import * as mc from "./config/mimocode.js";
+import * as cl from "./config/claude.js";
 
 function nowIso(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -58,6 +62,89 @@ export function migrateIfNeeded(): void {
   }
 
   info("Migration complete");
+}
+
+const AGENTS: Record<string, any> = { opencode: oc, mimocode: mc, claude: cl };
+
+export function importAllAgents(): void {
+  info("Importing agents to repository...");
+
+  for (const [agent, cfg] of Object.entries(AGENTS)) {
+    if (!cfg.is_available()) continue;
+
+    info(`Importing from agent: ${agent}`);
+
+    // Import MCP servers
+    try {
+      const agentServers = cfg.get_mcp_servers();
+      for (const [name, server] of Object.entries(agentServers)) {
+        const s = server as Record<string, any>;
+
+        if (!repository.exists(name)) {
+          const mcp: RepositoryMcp = {
+            name,
+            type: (s.type || "local") as McpType,
+            addedAt: nowIso(),
+            source: "import",
+          };
+          if (s.command) mcp.command = s.command;
+          if (s.url) mcp.url = s.url;
+          if (s.environment) mcp.environment = s.environment;
+          repository.add(mcp);
+          info(`Imported MCP '${name}' from ${agent}`);
+        }
+
+        if (!agentMcp.isEnabled(agent, name)) {
+          try {
+            agentMcp.enable(agent, name);
+          } catch (e) {
+            warn(`Failed to enable MCP '${name}' for ${agent}: ${(e as Error).message}`);
+          }
+        }
+      }
+    } catch (e) {
+      warn(`Failed to import MCP from ${agent}: ${(e as Error).message}`);
+    }
+
+    // Import skills from agent's user skills directory
+    try {
+      const userSkillsDir = getUserSkillsDir(agent);
+      if (existsSync(userSkillsDir)) {
+        for (const entry of readdirSync(userSkillsDir)) {
+          const entryPath = join(userSkillsDir, entry);
+          try {
+            if (!statSync(entryPath).isDirectory()) continue;
+            if (!existsSync(join(entryPath, "SKILL.md"))) continue;
+
+            const name = entry;
+
+            if (!repoSkill.exists(name)) {
+              const repoSkillDir = repoSkill.getSkillPath(name);
+              repoSkill.ensureSkillDir();
+              mkdirSync(repoSkillDir, { recursive: true });
+              cpSync(entryPath, repoSkillDir, { recursive: true });
+              repoSkill.add(name, `imported from ${agent}`, "local");
+              info(`Imported skill '${name}' from ${agent}`);
+            }
+
+            if (!agentSkill.isEnabled(agent, name)) {
+              try {
+                agentSkill.enable(agent, name);
+              } catch (e) {
+                warn(`Failed to enable skill '${name}' for ${agent}: ${(e as Error).message}`);
+              }
+            }
+          } catch {
+            // skip unreadable entries
+          }
+        }
+      }
+    } catch (e) {
+      warn(`Failed to import skills from ${agent}: ${(e as Error).message}`);
+    }
+  }
+
+  info("Agent import complete");
 }
 
 function migrateMcpData(oldDir: string): void {

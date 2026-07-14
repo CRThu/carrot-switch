@@ -83,8 +83,6 @@ export function enable(agent: string, name: string): void {
 }
 
 export function disable(agent: string, name: string): void {
-  checkAvailable(agent);
-
   const list = readEnableList(agent);
   const idx = list.indexOf(name);
   if (idx !== -1) {
