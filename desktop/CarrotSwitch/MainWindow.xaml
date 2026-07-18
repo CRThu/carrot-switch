@@ -1,0 +1,51 @@
+<Window x:Class="CarrotSwitch.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Carrot Switch"
+        Width="1100" Height="700"
+        MinWidth="800" MinHeight="500"
+        MaxHeight="900"
+        WindowStartupLocation="CenterScreen"
+        Background="#0f0f1a">
+    <Grid Margin="4">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Title bar -->
+        <Border Grid.Row="0" Background="#1a1a2e" CornerRadius="8,8,0,0" Padding="16,10">
+            <Grid>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="&#x1F955;" FontSize="18" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <TextBlock Text="Carrot Switch" Foreground="#e0e0e0" FontSize="16"
+                               FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock x:Name="StatusText" Foreground="#666680" FontSize="11"
+                           Text="Starting server..."
+                           HorizontalAlignment="Right" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <!-- WebView2 -->
+        <Border Grid.Row="1" CornerRadius="0,0,8,8" ClipToBounds="True">
+            <wv2:WebView2 x:Name="WebView" />
+        </Border>
+
+        <!-- Loading overlay -->
+        <Border x:Name="LoadingOverlay" Grid.Row="1" Background="#0f0f1a"
+                CornerRadius="0,0,8,8" ClipToBounds="True">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <TextBlock Text="&#x1F955;" FontSize="48"
+                           HorizontalAlignment="Center" Margin="0,0,0,12" />
+                <TextBlock Text="Carrot Switch" Foreground="#e0e0e0" FontSize="28"
+                           FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,8" />
+                <TextBlock x:Name="LoadingText" Text="Starting server..."
+                           Foreground="#666680" FontSize="14" HorizontalAlignment="Center" />
+                <ProgressBar IsIndeterminate="True" Width="200" Height="3"
+                             Margin="0,16,0,0" Foreground="#e07020" Background="#1a1a2e" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

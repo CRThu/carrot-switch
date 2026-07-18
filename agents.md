@@ -12,6 +12,7 @@ Carrot Switch is a standalone desktop tool for visually managing MCP servers and
 | Build | Vite 8 |
 | Backend | Hono + Bun.serve() |
 | Package | bun build --compile -> exe |
+| Desktop Host | C# WPF + WebView2 (.NET 10) |
 | Testing | bun test |
 
 ## Quick Start
@@ -53,6 +54,12 @@ carrot-switch/
 │               ├── RepositoryTab.svelte  # Repository management UI
 │               ├── AddMcpDialog.svelte   # Add MCP dialog
 │               └── InstallSkillDialog.svelte
+├── desktop/                     # C# WPF WebView2 host
+│   ├── CarrotSwitch/
+│   │   ├── CarrotSwitch.csproj  # .NET 10 WPF + WebView2
+│   │   ├── App.xaml / .cs       # WPF app entry
+│   │   └── MainWindow.xaml / .cs # Window: launch Bun server + WebView2
+│   └── publish/                 # (gitignored) dotnet publish output
 ├── server/                      # Bun + TypeScript backend
 │   ├── package.json             # hono, zod, adm-zip, tar + @carrot-switch/shared
 │   ├── tsconfig.json            # ESNext, bundler resolution + paths alias
@@ -80,7 +87,10 @@ carrot-switch/
 │               ├── manager.ts   # Skill install/uninstall/permission
 │               └── builtin.ts   # Builtin skills (read-only scan + permission toggle)
 ├── dist/                        # Build output
-│   └── carrot-switch.exe        # Compiled executable
+│   ├── carrot-switch.exe        # Bun-compiled executable (~94MB)
+│   └── carrot-switch-desktop/   # Desktop bundle (with -Desktop flag)
+│       ├── CarrotSwitch.exe     # WPF+WebView2 host (~59MB)
+│       └── carrot-switch.exe    # Bun backend
 ├── version.json                 # Version info (single source of truth)
 ├── package.json                 # Workspace root
 ├── AGENTS.md                    # This file
@@ -171,7 +181,7 @@ Carrot Switch uses a unified repository model at `%APPDATA%/.carrotswitch/`:
 ### Lifecycle
 
 ```
-carrot-switch start
+carrot-switch start (CLI mode)
   |-- 1. migrateIfNeeded() -> migrate old per-agent store to repository
   |-- 2. Bun.serve({ port: 0 }) -> random free port
   |-- 3. HTTP server starts (Hono)
@@ -179,6 +189,14 @@ carrot-switch start
   |-- 5. UI -> fetch API -> read/write repository + sync to agent config
   |-- 6. User closes browser tab
   '-- 7. Process exits
+
+CarrotSwitch.exe (Desktop mode)
+  |-- 1. WPF host starts
+  |-- 2. Launch carrot-switch.exe --no-browser as child process
+  |-- 3. Parse stdout for http://127.0.0.1:PORT
+  |-- 4. WebView2 loads the URL
+  |-- 5. User interacts in native window
+  '-- 6. Window closes -> kill child process
 ```
 
 ### Backup
@@ -247,6 +265,20 @@ cd server && bun run dev
 # Step 3: Compile to exe (produces dist/carrot-switch.exe ~94MB)
 cd server && bun run build
 ```
+
+### Desktop Build
+
+```powershell
+# Build desktop version (WPF+WebView2 host + Bun backend)
+.\build.ps1 -Desktop
+
+# Or via npm/bun
+bun run build:desktop
+```
+
+Output: `dist/carrot-switch-desktop/` with 2 files (~153MB total):
+- `CarrotSwitch.exe` — WPF host that launches the backend and opens a native WebView2 window
+- `carrot-switch.exe` — Bun-compiled backend (started with `--no-browser`)
 
 ### Dev Proxy
 

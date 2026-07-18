@@ -3,6 +3,9 @@ node_modules/
 
 # Build output
 dist/
+desktop/publish/
+desktop/CarrotSwitch/bin/
+desktop/CarrotSwitch/obj/
 
 # Frontend build artifacts
 server/src/web/static/

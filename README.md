@@ -33,9 +33,20 @@ cd server && bun run dev
 ### 编译为 exe
 
 ```bash
-cd server && bun run build
+bun run build
 # 输出: dist/carrot-switch.exe (~94MB)
 ```
+
+### 桌面版（WebView2 原生窗口）
+
+```powershell
+.\build.ps1 -Desktop
+# 输出: dist/carrot-switch-desktop/
+#   CarrotSwitch.exe  (~59MB)  WPF+WebView2 宿主
+#   carrot-switch.exe (~94MB)  Bun 后端
+```
+
+双击 `CarrotSwitch.exe` 启动，自动运行后端并打开原生窗口。
 
 ## 技术栈
 
@@ -43,6 +54,7 @@ cd server && bun run build
 |----|------|
 | Frontend | Svelte 5, TypeScript, Tailwind CSS 4, Vite 8 |
 | Backend | Hono, Bun.serve(), Zod |
+| Desktop Host | C# WPF + WebView2 (.NET 10) |
 | 打包 | `bun build --compile` → 单文件 exe |
 
 ## 项目结构
@@ -74,9 +86,17 @@ carrot-switch/
 │           ├── backup.ts    # 配置/Skill 备份
 │           ├── logger.ts    # 日志文件管理
 │           └── migration.ts # 旧版存储迁移
+├── desktop/                 # C# WPF WebView2 桌面宿主
+│   └── CarrotSwitch/
+│       ├── CarrotSwitch.csproj
+│       ├── App.xaml / .cs
+│       └── MainWindow.xaml / .cs
 ├── version.json             # 版本号
 └── dist/
-    └── carrot-switch.exe
+    ├── carrot-switch.exe           # Bun 编译的可执行文件
+    └── carrot-switch-desktop/      # 桌面版打包
+        ├── CarrotSwitch.exe        # WPF+WebView2 宿主
+        └── carrot-switch.exe       # Bun 后端
 ```
 
 ## 数据存储

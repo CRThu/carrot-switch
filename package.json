@@ -5,5 +5,9 @@
     "shared",
     "server",
     "frontend"
-  ]
+  ],
+  "scripts": {
+    "build": "powershell build.ps1",
+    "build:desktop": "powershell build.ps1 -Desktop"
+  }
 }
